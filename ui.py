@@ -67,19 +67,41 @@ def pct(x: float) -> str:
 # ------------------------------------------------------------------------ config
 
 
-@st.cache_resource
-def config() -> dict[str, Any]:
+# The YAML settings are cached, keyed on each file's modification time:
+# Streamlit Cloud applies a git push without restarting the process, so a
+# plain cache would keep serving the settings from before the push.
+def _mtime(path: Path) -> float:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+@st.cache_resource(max_entries=2)
+def _config(stamp: float) -> dict[str, Any]:
     return sheet_parser.load_config()
 
 
-@st.cache_resource
-def topics() -> dict[str, Any]:
+@st.cache_resource(max_entries=2)
+def _topics(stamp: float) -> dict[str, Any]:
     return topics_mod.load_topics()
 
 
-@st.cache_resource
-def templates() -> dict[str, Any]:
+@st.cache_resource(max_entries=2)
+def _templates(stamp: float) -> dict[str, Any]:
     return report_mod.load_templates()
+
+
+def config() -> dict[str, Any]:
+    return _config(_mtime(sheet_parser.CONFIG_PATH))
+
+
+def topics() -> dict[str, Any]:
+    return _topics(_mtime(topics_mod.TOPICS_PATH))
+
+
+def templates() -> dict[str, Any]:
+    return _templates(_mtime(report_mod.TEMPLATES_PATH))
 
 
 # ----------------------------------------------------------------------- storage

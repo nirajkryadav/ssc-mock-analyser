@@ -113,7 +113,8 @@ with t_over:
                 "Topic": w.topic, "Section": ui.short(w.section), "Questions": w.questions,
                 "Correct": w.correct, "Skipped": w.skipped,
                 "Accuracy %": round(w.accuracy * 100, 1), "Marks lost": w.marks_lost,
-                "Why": w.reason} for w in rep.weak], hide_index=True, width="stretch")
+                "Why": w.reason} for w in rep.weak], hide_index=True, width="stretch",
+                height="content")
         else:
             st.success("No topic fell below the thresholds in config.yaml.")
     with st.expander("Validation details"):
@@ -151,7 +152,7 @@ with t_resp:
 
 with t_topics:
     st.dataframe(scoring.breakdown_frame(card.topics), hide_index=True,
-                 width="stretch")
+                 width="stretch", height="content")
     unmatched = topics_mod.unmatched_rows(questions)
     if unmatched:
         st.caption(f"{len(unmatched)} question(s) did not match any keyword in topics.yaml "

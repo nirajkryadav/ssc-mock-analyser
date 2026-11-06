@@ -91,7 +91,7 @@ for r in shown:
 with st.expander("Compare all mocks in a table"):
     st.dataframe(
         pd.DataFrame(rows), hide_index=True, width="stretch",
-        height="auto" if len(rows) <= 14 else 560,
+        height="content",
         column_config={
             "Score": st.column_config.ProgressColumn(
                 min_value=0, max_value=float(max_score), format="%g", width=150,
