@@ -200,13 +200,6 @@ with st.container(horizontal=True):
         file_name=f"{rec['mock_name'].replace(' ', '_').lower()}_analysis.md",
         mime="text/markdown", icon=":material/download:")
     st.space("stretch")
-    with st.popover("Delete this mock", icon=":material/delete:"):
-        st.write(f"Delete “{rec['mock_name']}” for good? Its report, saved PDF and its "
-                 "place in your progress go with it.")
-        if st.button("Delete", type="primary", key=f"delete_{rec['id']}"):
-            ui.store().delete(rec["id"])
-            ui.refresh()
-            ui.flash(f"Deleted “{rec['mock_name']}”.")
-            st.switch_page(ui.PAGE_MOCKS)
+    ui.delete_control(rec, label="Delete this mock", then=ui.PAGE_MOCKS)
 if rec.get("analysis_seconds") is not None:
     st.caption(f"Analysed in {rec['analysis_seconds']:g} s · {ui.storage_label()}")

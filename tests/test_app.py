@@ -123,15 +123,35 @@ def test_unknown_mock_says_so(record_file):
     assert any("isn't saved" in w.value for w in at.warning)
 
 
+def test_deleting_needs_the_password(record_file, parsed, sample_pdf):
+    _seed(record_file, parsed, [("Mock 1", "2026-10-01"), ("Mock 2", "2026-10-15")],
+          pdf=sample_pdf.read_bytes())
+    at = _app("views/mock.py", id="mock-2")
+    at.text_input(key="pw_mock-2").input("wrong")
+    at.button(key="delete_mock-2").click().run()
+    assert not at.exception
+    assert any("Wrong password" in e.value for e in at.error)
+    assert records.FileStore(record_file).get("mock-2") is not None
+
+
 def test_deleting_a_mock_removes_it_and_its_pdf(record_file, parsed, sample_pdf):
     store = _seed(record_file, parsed, [("Mock 1", "2026-10-01"), ("Mock 2", "2026-10-15")],
                   pdf=sample_pdf.read_bytes())
     at = _app("views/mock.py", id="mock-2")
+    at.text_input(key="pw_mock-2").input("passowrd")
     at.button(key="delete_mock-2").click().run()
     assert not at.exception
     fresh = records.FileStore(record_file)
     assert fresh.get("mock-2") is None and fresh.get_files("mock-2") == []
     assert fresh.get("mock-1") is not None and store.get_files("mock-1")
+
+
+def test_all_mocks_opens_a_mock_without_selecting_a_row(record_file, parsed):
+    _seed(record_file, parsed, [("Mock 1", "2026-10-01"), ("Mock 2", "2026-10-15")])
+    at = _app("views/mocks.py")
+    at.button(key="open_mock-1").click().run()
+    assert not at.exception
+    assert any(">Mock 1<" in m.value for m in at.markdown if "page-title" in m.value)
 
 
 def test_top_bar_buttons_switch_pages(record_file, parsed):

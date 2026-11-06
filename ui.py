@@ -5,6 +5,8 @@ Pages live in views/ and are wired together in app.py.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import html
 import json
 import os
@@ -160,6 +162,44 @@ def go(label: str, page: str, icon: str | None = None, *, key: str,
     """
     if st.button(label, icon=icon, key=key, type=type, width=width):
         st.switch_page(page)
+
+
+# Deleting a mock needs a password. Only its SHA-256 is kept here; a
+# `delete_password` entry in Streamlit secrets overrides it.
+DELETE_PASSWORD_SHA256 = "19cb2a070ddbe8157e17c5dda0ea38e8aa16fae1725c1f7ac22747d870368579"
+
+
+def delete_password_ok(entered: str) -> bool:
+    try:
+        configured = st.secrets.get("delete_password")
+    except Exception:  # no secrets file locally
+        configured = None
+    if configured:
+        return hmac.compare_digest(entered.encode(), str(configured).encode())
+    digest = hashlib.sha256(entered.encode()).hexdigest()
+    return hmac.compare_digest(digest, DELETE_PASSWORD_SHA256)
+
+
+def delete_control(rec: dict[str, Any], *, label: str = "Delete",
+                   then: str | None = None, key: str = "") -> None:
+    """A Delete popover that asks for the password before removing the mock."""
+    rid = rec["id"]
+    with st.popover(label, icon=":material/delete:"):
+        st.write(f"Delete “{rec['mock_name']}” for good? Its report, saved PDF and its "
+                 "place in your progress go with it.")
+        with st.form(f"delete_form_{key}{rid}", border=False):
+            pw = st.text_input("Password", type="password", key=f"pw_{key}{rid}")
+            go_ = st.form_submit_button("Delete", type="primary", key=f"delete_{key}{rid}")
+        if go_:
+            if not delete_password_ok(pw):
+                st.error("Wrong password. Nothing was deleted.")
+            else:
+                store().delete(rid)
+                refresh()
+                flash(f"Deleted “{rec['mock_name']}”.")
+                if then:
+                    st.switch_page(then)
+                st.rerun()
 
 
 def open_mock(rid: str) -> None:
