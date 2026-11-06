@@ -2,10 +2,17 @@
 
 Upload your SSC CGL response sheet, get a scored breakdown, your weak topics,
 and a seven-day study plan. Everything is computed in code, with no AI API and
-no account. The Streamlit app saves every mock you analyse, with its PDF, and
-has four pages: a **Dashboard** of your progress, **All mocks** (search, open,
+no account. The Streamlit app saves every mock you analyse (the scored
+questions, not the PDF) and has four pages: a **Dashboard** of your progress, **All mocks** (search, open,
 delete, export), each mock's **report** (every response question by question,
-topics, plan, and the original PDF), and **Add a mock**.
+topics, plan), and **Add a mock**.
+
+It reads the official SSC candidate response sheet in any of these forms, in
+one upload: a combined sheet or the four PART files (any order), saved with
+Chrome's Print → Save as PDF (text, ~2 s) or as a screen capture (pictures,
+read with OCR), or a mix of both. Very small screen captures (under ~1100 px
+wide) are flagged, since OCR misreads them. Mock-test PDFs from other sites
+use a different layout and are rejected with a message rather than misread.
 
 ```
                    ┌─ text layer ─────────────┐
@@ -144,11 +151,10 @@ keywords and re-run.
 
 ## Privacy
 
-- The Streamlit app keeps a copy of each uploaded PDF so you can view it later
-  (untick "Keep a copy of the PDF" to skip that). On the deployed app it is
-  stored in Firestore, split into chunks under Firestore's 1 MiB document
-  limit; locally in `.records/files/`. Deleting a mock deletes its PDF.
-- The web version (`web/` + `api/`) reads the PDF in memory and discards it. It keeps the scored question records of each mock (in Firestore
+- The uploaded PDF is read in memory and discarded. What is kept is each
+  question with your answer and the correct one, which is what the report
+  shows. Deleting a mock needs the delete password.
+- The web version (`web/` + `api/`) does the same. It keeps the scored question records of each mock (in Firestore
   when deployed, in `.records/records.json` locally). There is no sign-in, so
   anyone with the site URL can see and delete them, including the name and roll
   number from the sheet.
@@ -236,9 +242,9 @@ app.py                  Streamlit entry point: navigation between the pages
 ui.py                   shared UI: storage, top bar, styling, charts, question cards
 views/dashboard.py      progress across every mock
 views/mocks.py          table of all mocks: search, sort, open, delete, export
-views/mock.py           one mock: overview, every response, topics, plan, PDF
+views/mock.py           one mock: overview, every response, topics, plan
 views/add.py            upload, analyse and save (timed)
-records.py              saved mocks and their PDFs: Firestore / file / memory stores
+records.py              saved mocks: Firestore / file / memory stores
 tools/firebase_secrets.py   key .json -> Streamlit secrets TOML
 netlify-embed/          Netlify page showing the Streamlit app full-screen
 firestore.rules         closes the database to direct clients

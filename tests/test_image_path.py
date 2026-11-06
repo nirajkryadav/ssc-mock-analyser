@@ -197,3 +197,45 @@ def test_image_fallback_can_be_refused(scanned_pdf, config):
 
 def test_text_pdf_still_takes_the_text_path(sample_pdf, config):
     assert parser.parse_pdf(sample_pdf, config).source == "text"
+
+
+# ------------------------------------------------- low-resolution screenshots
+
+def _as_picture_pdf(path, scale):
+    """Rasterise a PDF and wrap the pictures in a new PDF with no text layer."""
+    import io
+    import pypdfium2 as pdfium
+    doc = pdfium.PdfDocument(str(path))
+    imgs = [doc[i].render(scale=scale).to_pil().convert("RGB") for i in range(len(doc))]
+    buf = io.BytesIO()
+    imgs[0].save(buf, "PDF", save_all=True, append_images=imgs[1:], resolution=72 * scale)
+    return buf.getvalue()
+
+
+def test_a_missed_option_row_does_not_shift_the_answer():
+    """OCR can drop a short option on a small scan; the answer must stay in its row."""
+    import parser as P
+    rules = [100.0, 100.7, 125.0, 125.6, 150.0, 175.0, 200.0, 200.7, 201.4]
+    anchor = {"top": 80.0}
+    read = [{"text": "24", "top": 105, "bottom": 115, "mid": 110},
+            {"text": "40", "top": 130, "bottom": 140, "mid": 135},
+            {"text": "28", "top": 155, "bottom": 165, "mid": 160}]
+    slots = P._fill_missing_options(read, anchor, rules)
+    assert [o["text"] for o in slots] == ["24", "40", "28", ""]
+    assert 175 <= slots[3]["mid"] <= 200
+
+
+def test_option_rows_that_do_not_fit_the_table_are_left_alone():
+    import parser as P
+    read = [{"text": "x", "top": 300, "bottom": 310, "mid": 305}]
+    assert P._fill_missing_options(read, {"top": 80.0}, [100.0, 125.0]) == read
+
+
+def test_small_screenshots_are_flagged(fixtures_dir):
+    import pdfplumber, io
+    import parser as P
+    small = _as_picture_pdf(fixtures_dir / "sample_part-a.pdf", 1.5)
+    with pdfplumber.open(io.BytesIO(small)) as pdf:
+        assert P._picture_width(pdf) < P.LOW_RES_PX
+    with pdfplumber.open(fixtures_dir / "sample_scanned.pdf") as pdf:
+        assert P._picture_width(pdf) >= P.LOW_RES_PX

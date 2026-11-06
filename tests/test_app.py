@@ -73,7 +73,6 @@ def test_add_page_has_upload_form(record_file):
     assert at.text_input[0].value == "Mock 1"
     labels = [n.label for n in at.number_input]
     assert "Correct" in labels and "Wrong" in labels
-    assert at.checkbox[0].value is True  # keep the PDF by default
 
 
 def test_dashboard_shows_saved_mocks(record_file, parsed):
@@ -102,19 +101,17 @@ def test_all_mocks_lists_every_mock(record_file, parsed):
     assert list(at.dataframe[0].value["Mock"]) == ["Mock 2", "Mock 1"]  # newest first
 
 
-def test_mock_report_shows_responses_and_pdf(record_file, parsed, sample_pdf):
-    _seed(record_file, parsed, [("Mock 1", "2026-10-01"), ("Mock 2", "2026-10-15")],
-          pdf=sample_pdf.read_bytes())
+def test_mock_report_shows_responses(record_file, parsed):
+    _seed(record_file, parsed, [("Mock 1", "2026-10-01"), ("Mock 2", "2026-10-15")])
     at = _app("views/mock.py", id="mock-2")
     assert not at.exception
-    assert [t.label for t in at.tabs][:2] == ["Overview", "Responses (100)"]
-    assert any("Original PDF (1)" == t.label for t in at.tabs)
+    assert [t.label for t in at.tabs] == ["Overview", "Responses (100)", "Topics", "7-day plan"]
     assert any("Compared with your earlier mocks" in m.value for m in at.markdown)
-    # The PDF is only fetched once its tab is open.
-    assert "Download part-a.pdf" not in [b.label for b in at.get("download_button")]
-    at = _app("views/mock.py", state={"tabs_mock-2": "Original PDF (1)"}, id="mock-2")
-    assert not at.exception
-    assert "Download part-a.pdf" in [b.label for b in at.get("download_button")]
+
+
+def test_add_page_does_not_offer_to_keep_the_pdf(record_file):
+    at = _app("views/add.py")
+    assert not at.checkbox
 
 
 def test_unknown_mock_says_so(record_file):

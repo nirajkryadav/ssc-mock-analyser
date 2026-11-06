@@ -447,6 +447,7 @@ def _build_question(block, watermarks, section_lookup) -> tuple[Question, list[s
     options = _group_options(opt_lines, status_fills, rules)
     if len(options) != 4:
         warnings.append(f"Q{q_no}: found {len(options)} option rows, expected 4")
+        options = _fill_missing_options(options, anchor, rules)
 
     # Status comes from which colours are present, not from matching them to a
     # row. Questions whose options are images extract no option text at all, and
@@ -556,6 +557,41 @@ def _group_options(opt_lines, status_fills, rules) -> list[dict[str, Any]]:
     return groups
 
 
+def _fill_missing_options(options, anchor, rules) -> list[dict[str, Any]]:
+    """Put each option back in its own table row when OCR missed one.
+
+    Without this a missed row (OCR can drop a short option such as "32" on a
+    low-resolution scan) shifts every option below it up by one, and a colour
+    in row D would be credited to row C. The table rules say where the four
+    option rows are, so a missing one becomes an empty placeholder in place.
+    """
+    if not rules or len(options) >= 4:
+        return options
+    # On a scan one border can be detected as several rules a pixel apart, and a
+    # filled bar as a run of them; keep the top edge of each such cluster.
+    merged: list[float] = []
+    for r in sorted(rules):
+        if not merged or r - prev > 3.0:
+            merged.append(r)
+        prev = r
+    rules = merged
+    first = _band_index(anchor["top"], rules) + 1
+    bands = {_band_index(o["top"], rules): o for o in options}
+    if len(bands) != len(options) or any(b not in range(first, first + 4) for b in bands):
+        return options  # rows don't line up with the table; leave as read
+    if first - 1 < 0 or first + 3 > len(rules) - 1:
+        return options  # the table's rules for four rows aren't all visible
+    slots = []
+    for b in range(first, first + 4):
+        if b in bands:
+            slots.append(bands[b])
+        else:
+            top, bottom = rules[b - 1], rules[b]
+            slots.append({"text": "", "top": top, "bottom": bottom,
+                          "mid": (top + bottom) / 2})
+    return slots
+
+
 def _is_continuation(line, prev, status_fills, typical_gap) -> bool:
     """Spacing fallback used only when the block has no table rules."""
     for fill in status_fills:
@@ -650,6 +686,26 @@ def _repeated_numbers(tokens: Iterable[str], min_length: int = 6,
     return {t for t, n in counts.items() if n >= min_count}
 
 
+#: Below this many pixels across, OCR misreads this sheet. Measured on the test
+#: sheet: 1224 and 1275 px read 100/100; 918 px misread several questions.
+LOW_RES_PX = 1100
+
+
+def _picture_width(pdf) -> int | None:
+    """Pixel width of the narrowest full-page picture in an image-only PDF.
+
+    Pixels, not dpi: screenshot tools often size the PDF page so the picture is
+    "72 dpi" however sharp it really is, so dpi alone says little.
+    """
+    widths = []
+    for page in pdf.pages:
+        for im in page.images:
+            src = im.get("srcsize") or (0, 0)
+            if float(im["x1"]) - float(im["x0"]) > page.width * 0.5 and src[0]:
+                widths.append(int(src[0]))
+    return min(widths) if widths else None
+
+
 def parse_pdf(source: str | Path | bytes | io.BytesIO,
               config: dict[str, Any] | None = None,
               allow_image_fallback: bool = True,
@@ -686,6 +742,13 @@ def parse_pdf(source: str | Path | bytes | io.BytesIO,
                 raise ParseError(IMAGE_ONLY_MESSAGE)
             kind = "image"
             pages, backend = _pages_from_images(pdf, colours, dpi)
+            width_px = _picture_width(pdf)
+            if width_px and width_px < LOW_RES_PX:
+                warnings.append(
+                    f"Low-resolution scan: the page pictures are about {width_px} pixels "
+                    "wide, so some question or option text may be misread, and on very "
+                    "small pictures even an answer. A sharper capture, or Print \u2192 "
+                    "Save as PDF from Chrome, is more reliable.")
 
     meta = SheetMeta()
     for page in pages:

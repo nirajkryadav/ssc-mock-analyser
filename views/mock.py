@@ -1,4 +1,4 @@
-"""One mock's full report: score, sections, every response, topics, plan and the PDF."""
+"""One mock's full report: score, sections, every response, topics and the plan."""
 import streamlit as st
 
 import report as report_mod
@@ -75,12 +75,13 @@ if rec.get("source") == "image":
             "unaffected; question text may contain small OCR errors.",
             icon=":material/document_scanner:")
 
+low_res = [w for w in rec.get("warnings") or [] if w.startswith("Low-resolution scan")]
+if low_res:
+    st.warning(low_res[0], icon=":material/blur_on:")
+
 # -------------------------------------------------------------------------- tabs
-files_meta = rec.get("files") or []
-t_over, t_resp, t_topics, t_plan, t_pdf = st.tabs([
-    "Overview", f"Responses ({o.total})", "Topics", "7-day plan",
-    f"Original PDF{' (' + str(len(files_meta)) + ')' if files_meta else ''}"],
-    key=f"tabs_{rid}", on_change="rerun")  # so the PDF is fetched only when its tab opens
+t_over, t_resp, t_topics, t_plan = st.tabs(
+    ["Overview", f"Responses ({o.total})", "Topics", "7-day plan"])
 
 with t_over:
     left, right = st.columns([3, 2])
@@ -164,32 +165,6 @@ with t_plan:
             for title, body in day.blocks:
                 st.markdown(f"**{title}**")
                 st.write(body)
-
-with t_pdf:
-    if not files_meta:
-        st.info("The original PDF wasn't kept for this mock (it was analysed before PDFs "
-                "were saved). Every response is still in the **Responses** tab.",
-                icon=":material/info:")
-    elif not t_pdf.open:
-        st.caption("Loading the PDF…")
-    else:
-        files = ui.load_files(rec)
-        if not files:
-            st.warning("The PDF for this mock couldn't be found in storage.")
-        else:
-            names = [n for n, _ in files]
-            pick = 0
-            if len(files) > 1:
-                pick = st.segmented_control("File", list(range(len(files))),
-                                            format_func=lambda i: names[i], default=0,
-                                            key=f"pdf_{rid}") or 0
-            name, data = files[pick]
-            st.download_button(f"Download {name}", data, file_name=name,
-                               mime="application/pdf", icon=":material/download:")
-            try:
-                st.pdf(data, height=900)
-            except Exception:  # streamlit-pdf not installed
-                st.caption("Download the file to view it.")
 
 # ---------------------------------------------------------------- footer actions
 st.divider()

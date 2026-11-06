@@ -18,8 +18,9 @@ st.session_state.setdefault("upload_round", 0)
 round_ = st.session_state["upload_round"]
 
 ui.page_header("Add a mock",
-               "Upload the response sheet. It's read, scored and saved with its PDF, "
-               "then the full report opens.")
+               "Upload the response sheet. It's read, scored and saved, then the full "
+               "report opens. The PDF itself isn't kept: every question, your answer and "
+               "the correct one are saved in the report.")
 
 left, right = st.columns([3, 2], gap="large")
 
@@ -39,7 +40,6 @@ with left.container(border=True):
                                        step=0.25)
         wrong_mark = m2.number_input("Wrong", value=float(config["marking"]["wrong"]),
                                      step=0.25)
-    keep_pdf = st.checkbox("Keep a copy of the PDF so I can view it later", value=True)
     config = {**config, "marking": {"correct": float(correct_mark),
                                     "wrong": float(wrong_mark), "skipped": 0.0}}
 
@@ -76,9 +76,8 @@ if analyse and uploads:
     started = time.perf_counter()
     with st.status(f"Reading {len(uploads)} file(s)…", expanded=True) as status:
         st.write("Reading " + ", ".join(f.name for f in uploads))
-        files = [(f.name, f.getvalue()) for f in uploads]
         try:
-            parsed = sheet_parser.parse_many([b for _, b in files], config)
+            parsed = sheet_parser.parse_many([f.getvalue() for f in uploads], config)
         except ParseError as exc:
             status.update(label="This PDF could not be read", state="error")
             st.error(str(exc))
@@ -102,13 +101,9 @@ if analyse and uploads:
                 marking=config["marking"], mock_name=name,
                 mock_date=mock_date.isoformat(), validation_passed=not problems,
                 source=parsed.source, ocr_backend=parsed.ocr_backend or "",
-                warnings=parsed.warnings, existing=existing,
-                files=files if keep_pdf else None, seconds=seconds))
-            if keep_pdf:
-                st.write("Saving the PDF…")
-                store.put_files(rid, files)
-            elif existing:
-                store.put_files(rid, [])
+                warnings=parsed.warnings, existing=existing, seconds=seconds))
+            if existing and existing.get("files"):
+                store.put_files(rid, [])  # drop a PDF kept by an older version
         except Exception as exc:
             status.update(label="Scored, but could not save", state="error")
             st.error(f"The mock was scored but could not be saved: {exc}")

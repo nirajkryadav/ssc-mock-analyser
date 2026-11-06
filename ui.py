@@ -124,18 +124,8 @@ def load_records() -> list[dict[str, Any]]:
         return []
 
 
-@st.cache_data(max_entries=6, show_spinner="Loading the PDF…")
-def _load_files(key: str, rid: str, stamp: str) -> records_mod.Files:
-    return _store(key).get_files(rid)
-
-
-def load_files(rec: dict[str, Any]) -> records_mod.Files:
-    return _load_files(store_key(), rec["id"], rec.get("updated_at", ""))
-
-
 def refresh() -> None:
     _load_records.clear()
-    _load_files.clear()
 
 
 def on_streamlit_cloud() -> bool:
@@ -185,7 +175,7 @@ def delete_control(rec: dict[str, Any], *, label: str = "Delete",
     """A Delete popover that asks for the password before removing the mock."""
     rid = rec["id"]
     with st.popover(label, icon=":material/delete:"):
-        st.write(f"Delete “{rec['mock_name']}” for good? Its report, saved PDF and its "
+        st.write(f"Delete “{rec['mock_name']}” for good? Its report and its "
                  "place in your progress go with it.")
         with st.form(f"delete_form_{key}{rid}", border=False):
             pw = st.text_input("Password", type="password", key=f"pw_{key}{rid}")
@@ -465,10 +455,11 @@ def question_cards(questions, marking: dict[str, float]) -> str:
                 cls, tag = "is-correct", "✓ Correct answer"
             elif i == q.selected_index:
                 cls, tag = "is-wrong", "✗ Your answer"
+            body = (f'<span>{html.escape(text)}</span>' if text.strip() else
+                    '<span class="muted">(couldn&#39;t read this option)</span>')
             opts.append(
                 f'<li class="opt {cls}"><span class="l">{"ABCD"[i] if i < 4 else "?"}</span>'
-                f'<span>{html.escape(text)}</span>'
-                f'{f"<span class=tag>{tag}</span>" if tag else ""}</li>')
+                f'{body}{f"<span class=tag>{tag}</span>" if tag else ""}</li>')
         status = q.status if q.status in status_text else "skipped"
         out.append(
             f'<div class="q {status}"><div class="q-head">'

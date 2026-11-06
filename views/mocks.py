@@ -49,8 +49,7 @@ for r in shown:
     change = s_["score"] - p["summary"]["score"] if p else None
     with st.container(border=True, horizontal=True, vertical_alignment="center",
                       gap="small", key=f"row_{r['id']}"):
-        st.markdown(f"**{r['mock_name']}**  \n:gray[{r['mock_date']}"
-                    f"{' · with PDF' if r.get('files') else ''}]", width=165)
+        st.markdown(f"**{r['mock_name']}**  \n:gray[{r['mock_date']}]", width=165)
         st.markdown(
             f"**{ui.num(s_['score'])}** :gray[/ {ui.num(s_['max_score'])}]  \n"
             + (f":{'green' if change >= 0 else 'red'}[{change:+g}] :gray[vs previous]"
