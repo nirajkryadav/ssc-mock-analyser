@@ -15,7 +15,8 @@ if not records:
         st.write("Upload the response sheet of a mock you've taken. It's read, scored "
                  "and saved, and this dashboard fills in: your score trend, accuracy "
                  "by section, and the topics that cost you the most marks.")
-        st.page_link(ui.PAGE_ADD, label="Add your first mock", icon=":material/upload_file:")
+        ui.go("Add your first mock", ui.PAGE_ADD, ":material/upload_file:", key="first",
+              type="primary")
     st.stop()
 
 last, prev = records[-1], (records[-2] if len(records) > 1 else None)
@@ -113,7 +114,7 @@ with right.container(border=True, height="stretch"):
             if st.button("Open", key=f"open_{r['id']}", type="tertiary",
                          icon=":material/chevron_right:", icon_position="right"):
                 ui.open_mock(r["id"])
-    st.page_link(ui.PAGE_MOCKS, label=f"See all {len(records)} mocks",
-                 icon=":material/table_rows:")
+    ui.go(f"See all {len(records)} mocks", ui.PAGE_MOCKS, ":material/table_rows:",
+          key="see_all")
 
 st.caption(f"{ui.storage_label()} · {len(records)} mock(s)")

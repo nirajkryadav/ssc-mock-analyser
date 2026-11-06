@@ -150,6 +150,18 @@ def storage_label() -> str:
 # ------------------------------------------------------------------- navigation
 
 
+def go(label: str, page: str, icon: str | None = None, *, key: str,
+       type: str = "tertiary", width: str = "content") -> None:
+    """A navigation button.
+
+    st.page_link renders a plain link, and inside Streamlit Community Cloud's
+    outer page those links do nothing. A button that calls st.switch_page works
+    everywhere: the cloud page, the bare app URL, and the Netlify embed.
+    """
+    if st.button(label, icon=icon, key=key, type=type, width=width):
+        st.switch_page(page)
+
+
 def open_mock(rid: str) -> None:
     st.switch_page(PAGE_MOCK, query_params={"id": rid})
 
@@ -164,15 +176,17 @@ def show_flash() -> None:
         st.success(msg, icon=":material/check_circle:")
 
 
-def topbar() -> None:
+def topbar(current: str = "") -> None:
     with st.container(horizontal=True, vertical_alignment="center", gap="small",
                       key="topbar"):
         st.markdown('<div class="brand">📝 SSC Mock Analyser</div>',
                     unsafe_allow_html=True, width="content")
         st.space("stretch")
-        st.page_link(PAGE_DASHBOARD, label="Dashboard", icon=":material/space_dashboard:")
-        st.page_link(PAGE_MOCKS, label="All mocks", icon=":material/table_rows:")
-        st.page_link(PAGE_ADD, label="Add a mock", icon=":material/upload_file:")
+        for label, page, icon in (("Dashboard", PAGE_DASHBOARD, ":material/space_dashboard:"),
+                                  ("All mocks", PAGE_MOCKS, ":material/table_rows:"),
+                                  ("Add a mock", PAGE_ADD, ":material/upload_file:")):
+            go(label, page, icon, key=f"nav_{page}",
+               type="secondary" if page == current else "tertiary")
     if on_streamlit_cloud() and not store_key().startswith("firestore:"):
         st.warning("**Mocks saved here will be lost.** No Firebase key is set, so they go "
                    "to this server's disk, which Streamlit wipes whenever the app "
@@ -188,7 +202,7 @@ def page_header(title: str, subtitle: str = "", action: tuple[str, str, str] | N
                     f'</div>{sub}</div>', unsafe_allow_html=True, width="stretch")
         if action:
             label, page, icon = action
-            st.page_link(page, label=label, icon=icon, width="content")
+            go(label, page, icon, key=f"action_{page}", type="primary")
 
 
 # ------------------------------------------------------------------------ styling
@@ -198,9 +212,10 @@ CSS = """
 <style>
 .block-container { padding-top: 1.2rem; padding-bottom: 4rem; max-width: 1240px; }
 [data-testid="stHeader"] { background: transparent; height: 0; }
-[data-testid="stToolbar"] { top: .4rem; }
+[data-testid="stToolbarActions"], [data-testid="stAppDeployButton"],
+[data-testid="stMainMenu"], [data-testid="stDecoration"] { display: none !important; }
+.st-key-topbar button[kind="secondary"] { background: #eef3fb; border-color: #cfe0f6; color: #1f62b5; }
 .st-key-topbar { border-bottom: 1px solid #e5e7eb; padding-bottom: .6rem; margin-bottom: .6rem; }
-.st-key-topbar [data-testid="stPageLink"] a { border-radius: 8px; padding: .25rem .7rem; }
 .brand { font-weight: 700; font-size: 1.05rem; color: #111827; white-space: nowrap; }
 .page-head { margin: .2rem 0 .3rem; }
 .page-title { font-size: 1.85rem; font-weight: 700; color: #111827; line-height: 1.25; letter-spacing: -.01em; }

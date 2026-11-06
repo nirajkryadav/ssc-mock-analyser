@@ -132,3 +132,15 @@ def test_deleting_a_mock_removes_it_and_its_pdf(record_file, parsed, sample_pdf)
     fresh = records.FileStore(record_file)
     assert fresh.get("mock-2") is None and fresh.get_files("mock-2") == []
     assert fresh.get("mock-1") is not None and store.get_files("mock-1")
+
+
+def test_top_bar_buttons_switch_pages(record_file, parsed):
+    _seed(record_file, parsed, [("Mock 1", "2026-10-01")])
+    at = _app()
+    at.button(key="nav_views/mocks.py").click().run()
+    assert not at.exception
+    assert any("All mocks" in m.value for m in at.markdown if "page-title" in m.value)
+    at.button(key="nav_views/add.py").click().run()
+    assert any("Add a mock" in m.value for m in at.markdown if "page-title" in m.value)
+    at.button(key="nav_views/dashboard.py").click().run()
+    assert any(">Dashboard<" in m.value for m in at.markdown if "page-title" in m.value)

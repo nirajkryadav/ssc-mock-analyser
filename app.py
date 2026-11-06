@@ -29,5 +29,6 @@ page = st.navigation([
 ], position="hidden")  # our own top bar, so it shows in embedded mode too
 
 ui.apply_css()
-ui.topbar()
+NAV = {"Dashboard": ui.PAGE_DASHBOARD, "All mocks": ui.PAGE_MOCKS, "Add a mock": ui.PAGE_ADD}
+ui.topbar(current=NAV.get(page.title, ""))
 page.run()

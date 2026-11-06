@@ -13,7 +13,7 @@ idx = next((i for i, r in enumerate(records) if r["id"] == rid), None)
 if idx is None:
     ui.page_header("Mock not found")
     st.warning("That mock isn't saved (it may have been deleted).", icon=":material/info:")
-    st.page_link(ui.PAGE_MOCKS, label="Back to all mocks", icon=":material/arrow_back:")
+    ui.go("Back to all mocks", ui.PAGE_MOCKS, ":material/arrow_back:", key="back_missing")
     st.stop()
 
 rec = records[idx]
@@ -24,7 +24,7 @@ o, marking = card.overall, cfg["marking"]
 
 # ------------------------------------------------------------------------ header
 with st.container(horizontal=True, vertical_alignment="center"):
-    st.page_link(ui.PAGE_MOCKS, label="All mocks", icon=":material/arrow_back:")
+    ui.go("All mocks", ui.PAGE_MOCKS, ":material/arrow_back:", key="back")
     st.space("stretch")
     if st.button("Older", icon=":material/chevron_left:", disabled=older is None,
                  help=older and f"{older['mock_name']} · {older['mock_date']}"):

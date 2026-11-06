@@ -14,7 +14,8 @@ ui.page_header("All mocks",
 
 if not records:
     st.info("Nothing saved yet.", icon=":material/info:")
-    st.page_link(ui.PAGE_ADD, label="Add your first mock", icon=":material/upload_file:")
+    ui.go("Add your first mock", ui.PAGE_ADD, ":material/upload_file:", key="first",
+          type="primary")
     st.stop()
 
 SORTS = {
