@@ -17,6 +17,7 @@ import os
 import shutil
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -75,13 +76,17 @@ def _components(mask: np.ndarray, min_width: int, min_height: int) -> list[dict[
     height, width = mask.shape
     open_boxes: list[dict[str, int]] = []
     done: list[dict[str, int]] = []
+    # One vectorised pass instead of a numpy call per pixel row: most rows of a
+    # page hold no swatch at all, and this loop is the hot path of the OCR route.
+    filled = mask.any(axis=1)
 
     for y in range(height):
-        row = mask[y]
-        if not row.any():
-            done.extend(open_boxes)
-            open_boxes = []
+        if not filled[y]:
+            if open_boxes:
+                done.extend(open_boxes)
+                open_boxes = []
             continue
+        row = mask[y]
         # Runs of True in this row.
         idx = np.flatnonzero(np.diff(np.concatenate(([0], row.view(np.int8), [0]))))
         runs = [(int(a), int(b)) for a, b in zip(idx[::2], idx[1::2]) if b - a >= min_width]
@@ -264,27 +269,44 @@ def _ocr_vision(images, tmpdir: Path, scales: Sequence[float]) -> list[list[dict
     return out
 
 
+def workers(n_items: int, cap: int = 4) -> int:
+    """How many pages to process at once: the CPUs this process may use, capped."""
+    try:
+        cpus = len(os.sched_getaffinity(0))  # respects container CPU pinning (Linux)
+    except AttributeError:
+        cpus = os.cpu_count() or 1
+    return max(1, min(cap, cpus, n_items))
+
+
 def _ocr_tesseract(images, scales: Sequence[float]) -> list[list[dict[str, Any]]]:
+    n = workers(len(images))
+    if n > 1:
+        # Pages run as parallel tesseract processes; stop each one also spawning
+        # its own OpenMP threads, which would fight over the same cores.
+        os.environ.setdefault("OMP_THREAD_LIMIT", "1")
+        with ThreadPoolExecutor(n) as pool:
+            return list(pool.map(lambda pair: _ocr_tesseract_page(*pair),
+                                 zip(images, scales)))
+    return [_ocr_tesseract_page(img, scale) for img, scale in zip(images, scales)]
+
+
+def _ocr_tesseract_page(img, scale: float) -> list[dict[str, Any]]:
     import pytesseract
     from pytesseract import Output
 
-    out = []
-    for img, scale in zip(images, scales):
-        data = pytesseract.image_to_data(img, output_type=Output.DICT,
-                                         config=TESSERACT_CONFIG)
-        words = []
-        for i, text in enumerate(data["text"]):
-            # conf is -1 on the structural rows, whose text is blank anyway. A
-            # higher floor was tried and discarded: it drops short real tokens
-            # such as option letters and two-digit numbers.
-            if not text.strip() or int(data["conf"][i]) < 0:
-                continue
-            x, y = data["left"][i], data["top"][i]
-            w, h = data["width"][i], data["height"][i]
-            words.append({"text": text, "x0": x / scale, "x1": (x + w) / scale,
-                          "top": y / scale, "bottom": (y + h) / scale})
-        out.append(words)
-    return out
+    data = pytesseract.image_to_data(img, output_type=Output.DICT, config=TESSERACT_CONFIG)
+    words = []
+    for i, text in enumerate(data["text"]):
+        # conf is -1 on the structural rows, whose text is blank anyway. A
+        # higher floor was tried and discarded: it drops short real tokens
+        # such as option letters and two-digit numbers.
+        if not text.strip() or int(data["conf"][i]) < 0:
+            continue
+        x, y = data["left"][i], data["top"][i]
+        w, h = data["width"][i], data["height"][i]
+        words.append({"text": text, "x0": x / scale, "x1": (x + w) / scale,
+                      "top": y / scale, "bottom": (y + h) / scale})
+    return words
 
 
 def ocr_pages(images, scales: Sequence[float], tmpdir: Path,

@@ -624,17 +624,21 @@ def _pages_from_images(pdf, colours, dpi: int | None) -> tuple[list[dict[str, An
     # "repeated across the page" rule to recognise it.
     repeated = _repeated_numbers(w["text"] for page in words_per_page for w in page)
 
-    pages = []
-    for img, scale, height, words in zip(images, scales, heights, words_per_page):
+    def one_page(img, scale, height, words):
         words = image_source.drop_faint_words(img, words, scale)
         lines = group_words(words)
-        pages.append({
+        return {
             "lines": lines,
             "fills": image_source.detect_fills(img, colours, scale),
             "rules": image_source.detect_rules(img, scale),
             "height": height,
             "watermarks": _watermark_text(lines) | repeated,
-        })
+        }
+
+    # Pixel work is mostly numpy, which releases the GIL, so pages overlap well.
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(image_source.workers(len(images))) as pool:
+        pages = list(pool.map(one_page, images, scales, heights, words_per_page))
     return pages, backend
 
 
