@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -307,6 +308,55 @@ def _ocr_tesseract_page(img, scale: float) -> list[dict[str, Any]]:
         words.append({"text": text, "x0": x / scale, "x1": (x + w) / scale,
                       "top": y / scale, "bottom": (y + h) / scale})
     return words
+
+
+#: Second looks at a page, tried in order when question labels went missing:
+#: (resize factor, grey level below which a pixel counts as ink). Thresholding
+#: removes the pale roll-number watermark; a slightly smaller image changes how
+#: Tesseract segments the page. Measured on a real 38-page screen capture: the
+#: plain pass missed 11 labels, and these recovered all of them.
+RESCUE_VARIANTS = [(1.0, 200), (250 / 300, 220)]
+
+
+def ocr_variant(img, scale: float, variant: tuple[float, int]) -> list[dict[str, Any]]:
+    """OCR a resized, black-and-white copy of a page; boxes in PDF points."""
+    from PIL import Image
+
+    factor, threshold = variant
+    if factor != 1.0:
+        img = img.resize((round(img.size[0] * factor), round(img.size[1] * factor)),
+                         Image.LANCZOS)
+    grey = np.asarray(img.convert("L"))
+    bw = Image.fromarray(np.where(grey < threshold, 0, 255).astype(np.uint8))
+    return _ocr_tesseract_page(bw, scale * factor)
+
+
+def merge_words(base: Sequence[dict[str, Any]], extra: Sequence[dict[str, Any]],
+                overlap: float = 0.3) -> list[dict[str, Any]]:
+    """Add the words from `extra` that cover no word already in `base`."""
+    def covers(a, b):
+        w = min(a["x1"], b["x1"]) - max(a["x0"], b["x0"])
+        h = min(a["bottom"], b["bottom"]) - max(a["top"], b["top"])
+        if w <= 0 or h <= 0:
+            return False
+        area = min((a["x1"] - a["x0"]) * (a["bottom"] - a["top"]),
+                   (b["x1"] - b["x0"]) * (b["bottom"] - b["top"])) or 1
+        return w * h / area > overlap
+
+    # A "Q.No: n" label read on the clean copy wins over whatever the first
+    # pass made of that spot (often junk such as "nY Ain:"), since a missing
+    # label loses the whole question.
+    label = [w for w in extra if re.fullmatch(r"Q\W{0,2}N[o0a]\W{0,3}\d*", w["text"])]
+    for w in list(label):
+        nxt = [x for x in extra if x is not w and abs(x["top"] - w["top"]) < 4
+               and 0 <= x["x0"] - w["x1"] < 30 and x["text"].strip(":.").isdigit()]
+        label.extend(nxt[:1])
+    out = [have for have in base if not any(covers(w, have) for w in label)]
+    out.extend(label)
+    for word in extra:
+        if word not in label and not any(covers(word, have) for have in out):
+            out.append(word)
+    return out
 
 
 def ocr_pages(images, scales: Sequence[float], tmpdir: Path,

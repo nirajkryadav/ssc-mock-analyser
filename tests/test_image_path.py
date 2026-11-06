@@ -239,3 +239,57 @@ def test_small_screenshots_are_flagged(fixtures_dir):
         assert P._picture_width(pdf) < P.LOW_RES_PX
     with pdfplumber.open(fixtures_dir / "sample_scanned.pdf") as pdf:
         assert P._picture_width(pdf) >= P.LOW_RES_PX
+
+
+# ------------------------------------- fixes found on a real 38-page screen capture
+
+def test_question_labels_survive_ocr_punctuation():
+    import parser as P
+    for text in ("Q.No:; 51", "Q.No: 4", "Q.Na: 51", "Q No 7", "Q.N0: 12"):
+        assert P.Q_NO_RE.search(text), text
+    # The challenge buttons carry the number too, but are not question labels.
+    assert not P.Q_NO_RE.search("Click Here to Challenge Question No.: 51")
+
+
+def test_rows_split_across_a_page_join_are_not_counted_twice():
+    """Between two screenshots there is a white margin whose edges look like
+    table lines; that band must not become a fifth option row."""
+    import parser as P
+    # question cell bottom 716, rows A 716-744, B 744-772 | page join at 793 |
+    # C 813-841, D 841-868, then the thick bottom border.
+    rules = [716.2, 744.2, 772.1, 812.9, 840.8, 868.4, 869.1, 869.8, 870.5]
+    rows = P._option_rows(691.8, rules, page_starts=[793.0])
+    assert rows == [(716.2, 744.2), (744.2, 772.1), (812.9, 840.8), (840.8, 868.4)]
+
+
+def test_a_figure_frame_inside_the_question_is_not_the_end_of_the_options():
+    import parser as P
+    rules = [6649.3, 6650.0, 6650.7, 6710.7, 6711.4, 6735.4, 6761.4, 6787.5, 6813.4,
+             6839.6, 6840.3, 6841.0, 6841.8]
+    rows = P._option_rows(6617.4, rules)
+    assert rows[0] == (6735.4, 6761.4) and rows[-1] == (6813.4, 6839.6)
+
+
+def test_a_clean_reading_of_a_label_replaces_junk_at_the_same_spot():
+    import image_source as I
+    base = [{"text": "nY", "x0": 67, "x1": 80, "top": 460, "bottom": 466},
+            {"text": "Find", "x0": 106, "x1": 120, "top": 460, "bottom": 466}]
+    extra = [{"text": "Q.No:", "x0": 67, "x1": 84, "top": 460, "bottom": 466},
+             {"text": "51", "x0": 87, "x1": 95, "top": 460, "bottom": 466},
+             {"text": "Find", "x0": 106, "x1": 120, "top": 460, "bottom": 466}]
+    merged = [w["text"] for w in I.merge_words(base, extra)]
+    assert "nY" not in merged and "Q.No:" in merged and "51" in merged
+    assert merged.count("Find") == 1
+
+
+def test_the_last_question_keeps_its_answer_colours():
+    """The last block used to end at the last word OCR read, dropping the
+    colours of options whose text it missed."""
+    import parser as P
+    page = {"lines": [{"text": "Q.No: 100", "top": 10, "bottom": 16, "mid": 13, "x0": 67,
+                       "x1": 100}],
+            "fills": [{"status": "selected_correct", "mid": 150, "top": 145, "bottom": 155,
+                       "x0": 60, "x1": 70, "width": 10, "height": 10}],
+            "rules": [], "height": 300}
+    blocks = P._collect_blocks([page])
+    assert len(blocks[0]["fills"]) == 1

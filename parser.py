@@ -17,6 +17,7 @@ from __future__ import annotations
 import io
 import re
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from collections import Counter
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
@@ -34,7 +35,10 @@ IMAGE_ONLY_MESSAGE = (
     "keeps the text and the option colours."
 )
 
-Q_NO_RE = re.compile(r"Q\s*\.?\s*No\s*[:.]?\s*(\d+)", re.I)
+# OCR adds stray punctuation ("Q.No:; 51") and confuses o/0/a, so allow that.
+# "Question No.: 51" on the challenge buttons does not match: after "Q" only
+# a dot and spaces may come before "No".
+Q_NO_RE = re.compile(r"Q\s*\.?\s*N[o0a]\s*[:.;,]{0,3}\s*(\d+)", re.I)
 PART_RE = re.compile(r"\bPART\s*-\s*([A-D])\b", re.I)
 NOT_ANSWERED_RE = re.compile(r"not\s*answered", re.I)
 # Lines that are page chrome rather than question content.
@@ -359,12 +363,17 @@ def _collect_blocks(pages: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     blocks = []
     for i, (q_no, anchor) in enumerate(anchors):
         start = anchor["top"] - 1
-        end = anchors[i + 1][1]["top"] if i + 1 < len(anchors) else lines[-1]["bottom"] + 1
+        # The last question runs to the end of the document, not to the last line
+        # of text: on a scan OCR can miss its option text, and stopping at the
+        # last word read would cut off its answer colours.
+        end = anchors[i + 1][1]["top"] if i + 1 < len(anchors) else max(
+            offset, lines[-1]["bottom"] + 1)
         later = [t for t in header_tops if anchor["top"] < t < end]
         if later:
             end = min(later)
         blocks.append({
             "q_no": q_no,
+            "page_starts": offsets[1:],
             "anchor_line": anchor,
             "lines": [l for l in lines if start <= l["top"] < end],
             "fills": [f for f in fills if start <= f["mid"] < end],
@@ -416,7 +425,8 @@ def _clean(text: str, watermarks: set[str]) -> str:
     return re.sub(r"\s+", " ", " ".join(tokens)).strip()
 
 
-def _build_question(block, watermarks, section_lookup) -> tuple[Question, list[str]]:
+def _build_question(block, watermarks, section_lookup,
+                    table_rows: bool = False) -> tuple[Question, list[str]]:
     warnings: list[str] = []
     q_no = block["q_no"]
     lines = _block_lines(block)
@@ -447,7 +457,12 @@ def _build_question(block, watermarks, section_lookup) -> tuple[Question, list[s
     options = _group_options(opt_lines, status_fills, rules)
     if len(options) != 4:
         warnings.append(f"Q{q_no}: found {len(options)} option rows, expected 4")
-        options = _fill_missing_options(options, anchor, rules)
+    if len(options) != 4 or table_rows:
+        # Place options by the table's rows: a missing fragment otherwise shifts
+        # the letter of your answer. (Not forced on every scan: OCR's own rows
+        # are more reliable when it found all four.)
+        options = _fill_missing_options(options, anchor, rules,
+                                        block.get("page_starts", ()), force=table_rows)
 
     # Status comes from which colours are present, not from matching them to a
     # row. Questions whose options are images extract no option text at all, and
@@ -557,38 +572,67 @@ def _group_options(opt_lines, status_fills, rules) -> list[dict[str, Any]]:
     return groups
 
 
-def _fill_missing_options(options, anchor, rules) -> list[dict[str, Any]]:
-    """Put each option back in its own table row when OCR missed one.
-
-    Without this a missed row (OCR can drop a short option such as "32" on a
-    low-resolution scan) shifts every option below it up by one, and a colour
-    in row D would be credited to row C. The table rules say where the four
-    option rows are, so a missing one becomes an empty placeholder in place.
-    """
-    if not rules or len(options) >= 4:
-        return options
-    # On a scan one border can be detected as several rules a pixel apart, and a
-    # filled bar as a run of them; keep the top edge of each such cluster.
-    merged: list[float] = []
+def _rule_clusters(rules: Sequence[float], gap: float = 3.0) -> list[list[float]]:
+    """Group rules that sit within `gap` of each other: on a scan one border can be
+    detected as several rules a pixel apart, and a thick border as a run of them."""
+    out: list[list[float]] = []
     for r in sorted(rules):
-        if not merged or r - prev > 3.0:
-            merged.append(r)
-        prev = r
-    rules = merged
-    first = _band_index(anchor["top"], rules) + 1
-    bands = {_band_index(o["top"], rules): o for o in options}
-    if len(bands) != len(options) or any(b not in range(first, first + 4) for b in bands):
-        return options  # rows don't line up with the table; leave as read
-    if first - 1 < 0 or first + 3 > len(rules) - 1:
-        return options  # the table's rules for four rows aren't all visible
-    slots = []
-    for b in range(first, first + 4):
-        if b in bands:
-            slots.append(bands[b])
+        if out and r - out[-1][-1] <= gap:
+            out[-1].append(r)
         else:
-            top, bottom = rules[b - 1], rules[b]
-            slots.append({"text": "", "top": top, "bottom": bottom,
-                          "mid": (top + bottom) / 2})
+            out.append([r])
+    return out
+
+
+def _option_rows(anchor_top: float, rules: Sequence[float],
+                 page_starts: Sequence[float] = ()) -> list[tuple[float, float]] | None:
+    """The four option rows of a question, from the table's lines alone.
+
+    Each question is a table: the question cell (which may hold a figure with
+    lines of its own), then four option rows, then a thick bottom border. So
+    the four rows directly above the first thick border are A to D; without
+    one, the four rows after the question cell. A band that straddles a page
+    join is the white margin between two screenshots, not a row: the picture
+    edges there look like table lines.
+    """
+    clusters = [c for c in _rule_clusters(rules) if c[0] > anchor_top]
+    bands = [(clusters[i][0], clusters[i + 1][0], len(clusters[i + 1]) >= 3)
+             for i in range(len(clusters) - 1)]
+    bands = [b for b in bands if not any(b[0] < s < b[1] for s in page_starts)]
+    # A figure inside the question cell can have a thick frame of its own, so
+    # only a thick border with room for four rows above it can end the options.
+    ends = [i for i, b in enumerate(bands) if b[2] and i >= 3]
+    if ends:
+        rows = [(t, b) for t, b, _ in bands[ends[0] - 3: ends[0] + 1]]
+    elif len(bands) >= 4:
+        rows = [(t, b) for t, b, _ in bands[:4]]
+    else:
+        return None
+    if any(not 8 <= bottom - top <= 120 for top, bottom in rows):
+        return None  # not option-sized rows; the table isn't what we think
+    return rows
+
+
+def _fill_missing_options(options, anchor, rules, page_starts=(),
+                          force: bool = False) -> list[dict[str, Any]]:
+    """Rebuild the four option rows from the table when OCR missed some.
+
+    A missed row (OCR drops a short option such as "32", or the options are
+    pictures with no text at all) would otherwise shift the options below it,
+    and a colour in row B would be credited to row A. Rows come from the table
+    lines; whatever text OCR did read is put in the row it sits in, and a row
+    with none is left empty.
+    """
+    if not rules or (len(options) >= 4 and not force):
+        return options
+    rows = _option_rows(anchor["top"], rules, page_starts)
+    if rows is None:
+        return options
+    slots = []
+    for top, bottom in rows:
+        inside = [o for o in options if top - 1 <= o["mid"] <= bottom + 1]
+        slots.append({"text": " ".join(o["text"] for o in inside), "top": top,
+                      "bottom": bottom, "mid": (top + bottom) / 2})
     return slots
 
 
@@ -675,7 +719,88 @@ def _pages_from_images(pdf, colours, dpi: int | None) -> tuple[list[dict[str, An
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(image_source.workers(len(images))) as pool:
         pages = list(pool.map(one_page, images, scales, heights, words_per_page))
-    return pages, backend
+    # Kept so parse_pdf can re-read pages where question labels went missing.
+    state = {"images": images, "scales": scales, "heights": heights,
+             "words": words_per_page, "one_page": one_page}
+    return pages, backend, state
+
+
+def _anchor_pages(blocks, pages) -> dict[int, int]:
+    """Which page each question's "Q.No" label is on (blocks use one long axis)."""
+    starts, offset = [], 0.0
+    for page in pages:
+        starts.append(offset)
+        offset += page["height"] + 1
+    out = {}
+    for b in blocks:
+        top = b["anchor_line"]["top"]
+        out[b["q_no"]] = max(i for i, s in enumerate(starts) if s <= top)
+    return out
+
+
+def _gap_pages(blocks, pages, sections) -> tuple[list[int], set[int]]:
+    """Question numbers missing from this file, and the pages that should hold them.
+
+    The file's expected range is the PART(s) its questions belong to, so a gap
+    at the start or end of a PART counts as well as one in the middle.
+    """
+    if not blocks:
+        return [], set()
+    where = _anchor_pages(blocks, pages)
+    found = sorted(where)
+    lo = next((s["first_q"] for s in sections if s["first_q"] <= found[0] <= s["last_q"]),
+              found[0])
+    hi = next((s["last_q"] for s in sections if s["first_q"] <= found[-1] <= s["last_q"]),
+              found[-1])
+    missing = [n for n in range(lo, hi + 1) if n not in where]
+    todo: set[int] = set()
+    for n in missing:
+        before = [q for q in found if q < n]
+        after = [q for q in found if q > n]
+        first = where[before[-1]] if before else 0
+        last = where[after[0]] if after else len(pages) - 1
+        todo.update(range(first, last + 1))
+    return missing, todo
+
+
+def _rescue_missing(pages, state, blocks, sections) -> tuple[list[dict[str, Any]], list[str]]:
+    """Re-read the pages around missing question numbers with cleaner images.
+
+    Tesseract reading a whole page sometimes skips a "Q.No: n" label that it
+    reads perfectly on a cleaner image; the question then vanishes from the
+    score. The faint roll-number watermark is the usual trigger. Here the pages
+    that should hold a missing number are OCR'd again, thresholded so the
+    watermark disappears, and any word the first pass did not find is added.
+    Nothing the first pass read is replaced.
+    """
+    import image_source
+
+    missing, todo = _gap_pages(blocks, pages, sections)
+    if not missing or "tesseract" not in image_source.available_backends():
+        return pages, []
+    pages = list(pages)
+    reread: set[int] = set()
+    for variant in image_source.RESCUE_VARIANTS:
+        if not todo:
+            break
+        with ThreadPoolExecutor(image_source.workers(len(todo))) as pool:
+            extra = dict(zip(sorted(todo), pool.map(
+                lambda i: image_source.ocr_variant(state["images"][i], state["scales"][i],
+                                                   variant), sorted(todo))))
+        reread.update(extra)
+        for i, words in extra.items():
+            state["words"][i] = image_source.merge_words(state["words"][i], words)
+            pages[i] = state["one_page"](state["images"][i], state["scales"][i],
+                                         state["heights"][i], state["words"][i])
+        blocks = _collect_blocks(pages)
+        repair_numbering(blocks)
+        still, todo = _gap_pages(blocks, pages, sections)
+        if not still:
+            break
+    recovered = sorted(set(missing) - set(_gap_pages(blocks, pages, sections)[0]))
+    notes = [f"Re-read {len(reread)} page(s) to recover question(s) "
+             f"{', '.join(map(str, recovered))} that the first OCR pass missed"] if recovered else []
+    return pages, notes
 
 
 def _repeated_numbers(tokens: Iterable[str], min_length: int = 6,
@@ -741,7 +866,7 @@ def parse_pdf(source: str | Path | bytes | io.BytesIO,
             if not allow_image_fallback:
                 raise ParseError(IMAGE_ONLY_MESSAGE)
             kind = "image"
-            pages, backend = _pages_from_images(pdf, colours, dpi)
+            pages, backend, ocr_state = _pages_from_images(pdf, colours, dpi)
             width_px = _picture_width(pdf)
             if width_px and width_px < LOW_RES_PX:
                 warnings.append(
@@ -762,7 +887,14 @@ def parse_pdf(source: str | Path | bytes | io.BytesIO,
         watermarks |= page["watermarks"]
 
     blocks = _collect_blocks(pages)
-    warnings.extend(repair_numbering(blocks))
+    repairs = repair_numbering(blocks)
+    if kind == "image" and blocks:
+        pages, notes = _rescue_missing(pages, ocr_state, blocks, sections)
+        if notes:
+            warnings.extend(notes)
+            blocks = _collect_blocks(pages)
+            repairs = repair_numbering(blocks)
+    warnings.extend(repairs)
     if not blocks:
         raise ParseError(
             IMAGE_ONLY_MESSAGE if kind == "image" else
