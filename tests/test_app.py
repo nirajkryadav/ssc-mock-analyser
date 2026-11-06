@@ -161,3 +161,11 @@ def test_top_bar_buttons_switch_pages(record_file, parsed):
     assert any("Add a mock" in m.value for m in at.markdown if "page-title" in m.value)
     at.button(key="nav_views/dashboard.py").click().run()
     assert any(">Dashboard<" in m.value for m in at.markdown if "page-title" in m.value)
+
+
+def test_dashboard_shows_the_gap_to_the_target(record_file, parsed):
+    _seed(record_file, parsed, [("Mock 1", "2026-10-01")])  # scores 85
+    at = _app()
+    assert not at.exception
+    metrics = {m.label: m.value for m in at.metric}
+    assert metrics["Marks to 165"] == "80"

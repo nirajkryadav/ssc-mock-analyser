@@ -46,6 +46,12 @@ PAGE_MOCK = "views/mock.py"
 PAGE_ADD = "views/add.py"
 
 
+def target_score() -> float | None:
+    """The score you're aiming for (config.yaml analysis.target_score), if set."""
+    value = config().get("analysis", {}).get("target_score")
+    return float(value) if value else None
+
+
 def short(name: str) -> str:
     return SHORT.get(name, name)
 
@@ -308,7 +314,8 @@ def _style(chart: alt.Chart) -> alt.Chart:
             .configure_title(color=INK, fontSize=13, anchor="start", fontWeight=600))
 
 
-def score_chart(records: list[dict[str, Any]], height: int = 260) -> alt.Chart:
+def score_chart(records: list[dict[str, Any]], height: int = 260,
+                target: float | None = None) -> alt.Chart:
     names = [r["mock_name"] for r in records]
     df = pd.DataFrame([{
         "Mock": r["mock_name"], "Date": r["mock_date"],
@@ -328,8 +335,17 @@ def score_chart(records: list[dict[str, Any]], height: int = 260) -> alt.Chart:
         + alt.Chart(df.tail(1)).mark_text(align="left", dx=10, fontWeight="bold",
                                           color=INK, fontSize=13)
         .encode(x=x, y=y, text=alt.Text("Score:Q", format="~g"))
-    ).properties(height=height)
-    return _style(chart)
+    )
+    if target:
+        goal = pd.DataFrame({"Target": [target], "label": [f"Target {target:g}"]})
+        line = alt.Chart(goal).encode(y=alt.Y("Target:Q", scale=alt.Scale(domain=[0, top])))
+        chart = (line.mark_rule(color=INK2, strokeDash=[6, 4], strokeWidth=1.5)
+                 .encode(tooltip=[alt.Tooltip("Target:Q", title="Your target")])
+                 + line.mark_text(align="left", baseline="bottom", x=4, dy=-4,
+                                  color=INK2, fontSize=12, fontWeight=600)
+                 .encode(text="label:N")
+                 + chart)
+    return _style(chart.properties(height=height))
 
 
 def section_trend(records: list[dict[str, Any]], section: str) -> alt.Chart:

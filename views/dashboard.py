@@ -31,11 +31,29 @@ ui.page_header(
     action=("Add a mock", ui.PAGE_ADD, ":material/add:"))
 
 # ------------------------------------------------------------------ headline tiles
-k1, k2, k3, k4, k5 = st.columns(5)
+target = ui.target_score()
+cols = st.columns(6 if target else 5)
+k1, k2, k3, k4, k5 = cols[0], cols[1], cols[2], cols[-2], cols[-1]
+if target:
+    gap = target - last["summary"]["score"]
+    best_gap = target - best["summary"]["score"]
+    if gap > 0:
+        cols[3].metric(
+            f"Marks to {ui.num(target)}", ui.num(gap),
+            f"{last['summary']['score'] / target:.0%} of the way", delta_color="off",
+            delta_arrow="off", border=True, height="stretch",
+            help=f"Your latest score is {ui.num(last['summary']['score'])}; the target is "
+                 f"{ui.num(target)}. Your best ({ui.num(best['summary']['score'])}) was "
+                 + (f"{ui.num(best_gap)} short of it." if best_gap > 0 else "on or above it."))
+    else:
+        cols[3].metric(f"Marks to {ui.num(target)}", "Reached", f"{-gap:+g} above",
+                       border=True, height="stretch",
+                       help=f"Your latest score is {ui.num(last['summary']['score'])}, at or "
+                            f"above your target of {ui.num(target)}.")
 k1.metric("Latest score", ui.num(last["summary"]["score"]),
           f"{last['summary']['score'] - prev['summary']['score']:+g}" if prev else None,
-          delta_description=f"vs {prev['mock_name']}" if prev else None,
-          help=f"{last['mock_name']}, out of {ui.num(last['summary']['max_score'])}",
+          help=f"{last['mock_name']}, out of {ui.num(last['summary']['max_score'])}"
+               + (f". Change is against {prev['mock_name']}." if prev else ""),
           border=True, height="stretch")
 k2.metric("Best score", ui.num(best["summary"]["score"]), border=True, height="stretch",
           help=f"{best['mock_name']} · {best['mock_date']}")
@@ -54,9 +72,10 @@ k5.metric("Latest attempted", f"{last['summary']['attempt_rate']:.0f}%",
 left, right = st.columns([2, 1])
 with left.container(border=True, height="stretch"):
     st.markdown('<p class="card-title">Score by mock</p>'
-                f'<p class="card-sub">Out of {ui.num(last["summary"]["max_score"])}. '
-                'Hover a point for details.</p>', unsafe_allow_html=True)
-    st.altair_chart(ui.score_chart(records, height=330), width="stretch")
+                f'<p class="card-sub">Out of {ui.num(last["summary"]["max_score"])}'
+                + (f'; the dashed line is your target of {ui.num(target)}' if target else '')
+                + '. Hover a point for details.</p>', unsafe_allow_html=True)
+    st.altair_chart(ui.score_chart(records, height=330, target=target), width="stretch")
 
 with right.container(border=True, height="stretch"):
     st.markdown('<p class="card-title">Latest mock</p>'
@@ -66,6 +85,11 @@ with right.container(border=True, height="stretch"):
                 unsafe_allow_html=True)
     s = last["summary"]
     st.caption(f"{s['correct']} correct · {s['wrong']} wrong · {s['skipped']} skipped")
+    if target:
+        gap = target - s["score"]
+        st.progress(max(0.0, min(1.0, s["score"] / target)),
+                    text=(f"**Target {ui.num(target)}** — {ui.num(gap)} marks to go"
+                          if gap > 0 else f"**Target {ui.num(target)}** — reached"))
     for sec in last.get("sections", []):
         share = sec["score"] / sec["max_score"] if sec["max_score"] else 0
         st.progress(max(0.0, min(1.0, share)),

@@ -44,7 +44,11 @@ rank = sorted((r["summary"]["score"] for r in records), reverse=True).index(rec[
 k = st.columns(5)
 k[0].metric("Score", f"{ui.num(o.score)} / {ui.num(o.max_score)}",
             f"{o.score - older['summary']['score']:+g}" if older else None,
-            delta_description=f"vs {older['mock_name']}" if older else None, border=True)
+            delta_description=f"vs {older['mock_name']}" if older else None, border=True,
+            help=(f"{ui.num(ui.target_score() - o.score)} marks below your target of "
+                  f"{ui.num(ui.target_score())}" if ui.target_score() and o.score < ui.target_score()
+                  else f"At or above your target of {ui.num(ui.target_score())}"
+                  if ui.target_score() else None))
 k[1].metric("Accuracy", ui.pct(o.accuracy), border=True,
             help=f"{o.correct} right of {o.attempted} attempted")
 k[2].metric("Attempted", f"{o.attempted} / {o.total}", border=True,

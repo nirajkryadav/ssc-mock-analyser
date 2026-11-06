@@ -33,6 +33,7 @@ analysis:
   weak_topic_skip_rate: 0.50     # or more than this share skipped
   weak_topic_min_questions: 2    # ignore topics with fewer questions than this
   target_attempt_rate: 0.80      # attempt-strategy advice fires below this
+  target_score: 165              # your goal: drawn on the dashboard, with the gap to it
 
 # Colour -> status. Values are sRGB hex as printed by the SSC response sheet.
 # tolerance is max per-channel distance, to survive PDF colour-space rounding.
