@@ -11,8 +11,14 @@ It reads the official SSC candidate response sheet in any of these forms, in
 one upload: a combined sheet or the four PART files (any order), saved with
 Chrome's Print → Save as PDF (text, ~2 s) or as a screen capture (pictures,
 read with OCR), or a mix of both. Very small screen captures (under ~1100 px
-wide) are flagged, since OCR misreads them. Mock-test PDFs from other sites
-use a different layout and are rejected with a message rather than misread.
+wide) are flagged, since OCR misreads them.
+
+It also reads **Testbook** mock-test *Solutions* pages (a full-page screen
+capture saved as PDF): questions come from the "Q. n)" labels, the result from
+each "Marks:" pill's colour, and the correct and chosen options from the green
+and red letter circles. The score is checked against the "My Total Marks"
+Testbook prints. Other sites' layouts are rejected with a message rather than
+misread.
 
 ```
                    ┌─ text layer ─────────────┐
@@ -254,6 +260,7 @@ web/                    static front end deployed to Netlify
 Dockerfile              backend container, Tesseract included
 DEPLOY.md               Netlify + Cloud Run deployment
 parser.py               PDF → question records, plus validation
+testbook.py             reader for Testbook solution pages
 image_source.py         the no-text-layer path: pixel colours, rules, OCR
 ocr/vision_ocr.swift    offline OCR via the macOS Vision framework
 topics.py               keyword → topic tagging, unmatched.csv
@@ -273,6 +280,7 @@ tests/
   test_api.py           the HTTP endpoints, saved mocks, and failure modes
   test_app.py           Streamlit pages: dashboard, add, all mocks, report, delete
   test_records.py       stored PDFs: file store, chunked Firestore, deletion
+  test_testbook.py      Testbook pills, circles, labels and option rows
 ```
 
 ## Known limits

@@ -61,6 +61,9 @@ with right.container(border=True):
         "2. Press **Print → Destination: Save as PDF** for each PART (A–D).\n"
         "3. Upload all four files here together.")
     st.caption("PDFs saved this way keep their text and are read in a few seconds.")
+    st.caption("**Testbook mocks** work too: open the test's *Solutions* page and save "
+               "it as a PDF (a full-page screen capture is fine). The score is checked "
+               "against Testbook's own total.")
     backends = image_source.available_backends()
     if backends:
         st.caption(f"A screen-capture PDF (pictures of the pages, no text) also works. "

@@ -896,10 +896,27 @@ def parse_pdf(source: str | Path | bytes | io.BytesIO,
             repairs = repair_numbering(blocks)
     warnings.extend(repairs)
     if not blocks:
+        import testbook
+
+        if testbook.looks_like(pages):
+            data = (bytes(source) if isinstance(source, (bytes, bytearray)) else
+                    source.getvalue() if isinstance(source, io.BytesIO) else
+                    Path(source).read_bytes())
+            state = ocr_state if kind == "image" else {}
+            result = testbook.parse(data, pages, cfg, images=state.get("images"),
+                                    scales=state.get("scales"), raw_words=state.get("words"))
+            result.source, result.ocr_backend = kind, backend
+            result.warnings = warnings + result.warnings
+            return result
+        words = sum(len(l["text"].split()) for p in pages for l in p["lines"])
+        if kind == "image" and words < 20:
+            raise ParseError(IMAGE_ONLY_MESSAGE)
         raise ParseError(
-            IMAGE_ONLY_MESSAGE if kind == "image" else
-            "No 'Q.No:' markers were found. This does not look like an SSC CGL "
-            "candidate response sheet."
+            "This PDF was read, but it isn't in a layout this app knows. It reads the "
+            "official SSC candidate response sheet (\"Q.No: 1\" labels with coloured "
+            "option swatches) and Testbook mock-test solution pages (\"Q. 1)\" with "
+            "\"Marks:\" pills). If this is one of those, the page may be cut off or "
+            "too small to read; otherwise, share a sample so support can be added."
         )
 
     questions: list[Question] = []

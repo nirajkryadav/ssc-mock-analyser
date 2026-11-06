@@ -79,6 +79,11 @@ if rec.get("source") == "image":
             "unaffected; question text may contain small OCR errors.",
             icon=":material/document_scanner:")
 
+for note in rec.get("warnings") or []:
+    if note.startswith("Score matches Testbook"):
+        st.success(note + ". Every question and its marks were read.", icon=":material/verified:")
+    elif "differs from Testbook" in note:
+        st.warning(note + ".", icon=":material/warning:")
 low_res = [w for w in rec.get("warnings") or [] if w.startswith("Low-resolution scan")]
 if low_res:
     st.warning(low_res[0], icon=":material/blur_on:")
