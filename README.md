@@ -2,8 +2,10 @@
 
 Upload your SSC CGL response sheet, get a scored breakdown, your weak topics,
 and a seven-day study plan. Everything is computed in code, with no AI API and
-no account. The web version saves each analysed mock so one page shows your
-progress across all of them.
+no account. The Streamlit app saves every mock you analyse, with its PDF, and
+has four pages: a **Dashboard** of your progress, **All mocks** (search, open,
+delete, export), each mock's **report** (every response question by question,
+topics, plan, and the original PDF), and **Add a mock**.
 
 ```
                    ┌─ text layer ─────────────┐
@@ -142,8 +144,11 @@ keywords and re-run.
 
 ## Privacy
 
-- The PDF is read from memory and discarded. It is never written to disk.
-- The web version keeps the scored question records of each mock (in Firestore
+- The Streamlit app keeps a copy of each uploaded PDF so you can view it later
+  (untick "Keep a copy of the PDF" to skip that). On the deployed app it is
+  stored in Firestore, split into chunks under Firestore's 1 MiB document
+  limit; locally in `.records/files/`. Deleting a mock deletes its PDF.
+- The web version (`web/` + `api/`) reads the PDF in memory and discards it. It keeps the scored question records of each mock (in Firestore
   when deployed, in `.records/records.json` locally). There is no sign-in, so
   anyone with the site URL can see and delete them, including the name and roll
   number from the sheet.
@@ -227,8 +232,15 @@ Notes:
 ## Project layout
 
 ```
-app.py                  Streamlit app: progress, analyse, all mocks, report
-records.py              saved mocks: Firestore / JSON-file / memory stores
+app.py                  Streamlit entry point: navigation between the pages
+ui.py                   shared UI: storage, top bar, styling, charts, question cards
+views/dashboard.py      progress across every mock
+views/mocks.py          table of all mocks: search, sort, open, delete, export
+views/mock.py           one mock: overview, every response, topics, plan, PDF
+views/add.py            upload, analyse and save (timed)
+records.py              saved mocks and their PDFs: Firestore / file / memory stores
+tools/firebase_secrets.py   key .json -> Streamlit secrets TOML
+netlify-embed/          Netlify page showing the Streamlit app full-screen
 firestore.rules         closes the database to direct clients
 packages.txt            apt packages for Streamlit Cloud (Tesseract)
 api/main.py             HTTP API for the hosted version (FastAPI)
@@ -253,7 +265,8 @@ tests/
   test_report.py        weak areas, trends, plan, Markdown
   test_image_path.py    pixel detection, OCR path, numbering repair
   test_api.py           the HTTP endpoints, saved mocks, and failure modes
-  test_app.py           Streamlit app: progress, saved mocks, open and delete
+  test_app.py           Streamlit pages: dashboard, add, all mocks, report, delete
+  test_records.py       stored PDFs: file store, chunked Firestore, deletion
 ```
 
 ## Known limits

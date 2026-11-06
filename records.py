@@ -3,7 +3,8 @@
 A record is one analysed mock: its question records (so the full report can be
 rebuilt later, against the current topics.yaml), the marking it was scored
 under, and a precomputed summary so the progress view does not re-score
-everything on every load. The PDF itself is never kept.
+everything on every load. The original PDFs are kept beside the record (see
+put_files) so a past mock can be reopened as it was uploaded.
 
 Three interchangeable stores:
 
@@ -36,6 +37,13 @@ DEFAULT_FILE = ROOT / ".records" / "records.json"
 # ----------------------------------------------------------------------- stores
 
 
+#: A mock's original PDFs, as (file name, bytes) pairs in upload order.
+Files = list[tuple[str, bytes]]
+
+#: Firestore caps a document at 1 MiB, so PDFs are stored in chunks below that.
+CHUNK = 900_000
+
+
 class RecordStore(Protocol):
     kind: str
 
@@ -43,6 +51,13 @@ class RecordStore(Protocol):
     def get(self, rid: str) -> dict[str, Any] | None: ...
     def put(self, rid: str, record: dict[str, Any]) -> None: ...
     def delete(self, rid: str) -> bool: ...
+    def put_files(self, rid: str, files: Files) -> None: ...
+    def get_files(self, rid: str) -> Files: ...
+
+
+def _safe_name(name: str) -> str:
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(name).name).strip("._")
+    return stem[:100] or "sheet.pdf"
 
 
 class MemoryStore:
@@ -50,6 +65,7 @@ class MemoryStore:
 
     def __init__(self) -> None:
         self._data: dict[str, dict[str, Any]] = {}
+        self._files: dict[str, Files] = {}
 
     def list(self) -> list[dict[str, Any]]:
         return [dict(r) for r in self._data.values()]
@@ -62,17 +78,26 @@ class MemoryStore:
         self._data[rid] = dict(record)
 
     def delete(self, rid: str) -> bool:
+        self._files.pop(rid, None)
         return self._data.pop(rid, None) is not None
+
+    def put_files(self, rid: str, files: Files) -> None:
+        """Replace the mock's stored PDFs."""
+        self._files[rid] = [(n, bytes(b)) for n, b in files]
+
+    def get_files(self, rid: str) -> Files:
+        return list(self._files.get(rid, []))
 
 
 class FileStore(MemoryStore):
-    """MemoryStore written through to a JSON file after every change."""
+    """MemoryStore written through to a JSON file; PDFs go in a folder beside it."""
 
     kind = "file"
 
     def __init__(self, path: Path) -> None:
         super().__init__()
         self.path = Path(path)
+        self.files_dir = self.path.parent / "files"
         self._lock = threading.Lock()
         if self.path.exists():
             self._data = json.loads(self.path.read_text("utf-8") or "{}")
@@ -83,6 +108,9 @@ class FileStore(MemoryStore):
         tmp.write_text(json.dumps(self._data, ensure_ascii=False), "utf-8")
         tmp.replace(self.path)
 
+    def _dir(self, rid: str) -> Path:
+        return self.files_dir / record_id(rid)
+
     def put(self, rid: str, record: dict[str, Any]) -> None:
         with self._lock:
             super().put(rid, record)
@@ -90,21 +118,46 @@ class FileStore(MemoryStore):
 
     def delete(self, rid: str) -> bool:
         with self._lock:
+            self._clear_files(rid)
             found = super().delete(rid)
             if found:
                 self._flush()
             return found
 
+    def _clear_files(self, rid: str) -> None:
+        d = self._dir(rid)
+        if d.is_dir():
+            for f in d.iterdir():
+                f.unlink()
+            d.rmdir()
+
+    def put_files(self, rid: str, files: Files) -> None:
+        with self._lock:
+            self._clear_files(rid)
+            d = self._dir(rid)
+            d.mkdir(parents=True, exist_ok=True)
+            for i, (name, data) in enumerate(files):
+                (d / f"{i:02d}-{_safe_name(name)}").write_bytes(data)
+
+    def get_files(self, rid: str) -> Files:
+        d = self._dir(rid)
+        if not d.is_dir():
+            return []
+        return [(f.name.split("-", 1)[1], f.read_bytes()) for f in sorted(d.iterdir())]
+
 
 class FirestoreStore:
+    """Mocks in collection `mocks`; each mock's PDFs in its `files` subcollection,
+    split into chunks under Firestore's 1 MiB document limit."""
+
     kind = "firestore"
 
     def __init__(self, project: str | None = None, credentials: Any = None) -> None:
         from google.cloud import firestore  # only needed when this store is used
 
         self.project = project
-        self._col = firestore.Client(project=project, credentials=credentials) \
-            .collection(COLLECTION)
+        self._client = firestore.Client(project=project, credentials=credentials)
+        self._col = self._client.collection(COLLECTION)
 
     @classmethod
     def from_service_account(cls, info: dict[str, Any]) -> "FirestoreStore":
@@ -126,10 +179,42 @@ class FirestoreStore:
 
     def delete(self, rid: str) -> bool:
         ref = self._col.document(rid)
+        self._clear_files(rid)  # a document's subcollection outlives it otherwise
         if not ref.get().exists:
             return False
         ref.delete()
         return True
+
+    def _files(self, rid: str):
+        return self._col.document(rid).collection("files")
+
+    def _clear_files(self, rid: str) -> None:
+        refs = [d.reference for d in self._files(rid).stream()]
+        for start in range(0, len(refs), 400):
+            batch = self._client.batch()
+            for r in refs[start:start + 400]:
+                batch.delete(r)
+            batch.commit()
+
+    def put_files(self, rid: str, files: Files) -> None:
+        self._clear_files(rid)
+        col = self._files(rid)
+        for i, (name, data) in enumerate(files):
+            # One batch per chunk keeps every request well under the 10 MiB limit.
+            for c, start in enumerate(range(0, max(len(data), 1), CHUNK)):
+                col.document(f"{i:02d}-{c:04d}").set({
+                    "file": i, "name": _safe_name(name), "chunk": c,
+                    "data": data[start:start + CHUNK]})
+
+    def get_files(self, rid: str) -> Files:
+        parts = sorted((d.to_dict() for d in self._files(rid).stream()),
+                       key=lambda p: (p["file"], p["chunk"]))
+        out: Files = []
+        for p in parts:
+            if not out or len(out) - 1 != p["file"]:
+                out.append((p["name"], b""))
+            out[-1] = (out[-1][0], out[-1][1] + bytes(p["data"]))
+        return out
 
 
 def store_from_env() -> RecordStore:
@@ -197,7 +282,9 @@ def make_record(*, questions: list[Question], card: scoring.ScoreCard, meta: dic
                 marking: dict[str, float], mock_name: str, mock_date: str,
                 validation_passed: bool, source: str = "text", ocr_backend: str = "",
                 warnings: list[str] | None = None,
-                existing: dict[str, Any] | None = None) -> dict[str, Any]:
+                existing: dict[str, Any] | None = None,
+                files: Files | None = None,
+                seconds: float | None = None) -> dict[str, Any]:
     now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
     return {
         "id": record_id(mock_name),
@@ -216,4 +303,7 @@ def make_record(*, questions: list[Question], card: scoring.ScoreCard, meta: dic
         "topics": [{**breakdown(b), "section": card.topic_sections.get(b.label, "")}
                    for b in card.topics],
         "validation_passed": validation_passed,
+        # What was kept of the original PDFs (the bytes live in the store's files).
+        "files": [{"name": _safe_name(n), "size": len(b)} for n, b in (files or [])],
+        "analysis_seconds": round(seconds, 1) if seconds is not None else None,
     }

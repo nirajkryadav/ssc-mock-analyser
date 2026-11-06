@@ -1,7 +1,7 @@
 """Smoke tests for the Streamlit app using Streamlit's own AppTest.
 
 AppTest cannot drive a file upload, so the saved-mock paths are tested by
-seeding the local record file directly, the same shape the app writes.
+seeding the local record store directly, the same shape the app writes.
 """
 from pathlib import Path
 
@@ -34,74 +34,96 @@ def parsed(sample_pdf):
     return result
 
 
-def _seed(path, parsed, mocks):
+def _seed(path, parsed, mocks, pdf=None):
     config = sheet_parser.load_config()
     store = records.FileStore(path)
+    files = [("part-a.pdf", pdf)] if pdf else None
     for name, date in mocks:
         card = scoring.score(parsed.questions, config)
         rec = records.make_record(
             questions=parsed.questions, card=card, meta=parsed.meta.__dict__,
             marking=config["marking"], mock_name=name, mock_date=date,
-            validation_passed=True)
+            validation_passed=True, files=files)
         store.put(rec["id"], rec)
+        if files:
+            store.put_files(rec["id"], files)
     return store
 
 
-def _run(**state):
+def _app(page=None, **query):
     at = AppTest.from_file(APP, default_timeout=60)
-    for k, v in state.items():
-        at.session_state[k] = v
+    for k, v in query.items():
+        at.query_params[k] = v
+    if page:
+        at.switch_page(page)
     return at.run()
 
 
-def test_app_renders_with_nothing_saved(record_file):
-    at = _run()
+def test_dashboard_with_nothing_saved(record_file):
+    at = _app()
     assert not at.exception
-    assert at.title[0].value == "SSC Mock Analyser"
-    assert any("No mocks saved yet" in m.value for m in at.info)
-    # With no file chosen the app explains how to get a usable PDF.
-    assert any("Save as PDF" in m.value for m in at.info)
+    assert any("No mocks yet" in m.value for m in at.markdown)
+
+
+def test_add_page_has_upload_form(record_file):
+    at = _app("views/add.py")
+    assert not at.exception
     assert at.text_input[0].value == "Mock 1"
-
-
-def test_marking_scheme_is_editable(record_file):
-    at = _run()
     labels = [n.label for n in at.number_input]
     assert "Correct" in labels and "Wrong" in labels
+    assert at.checkbox[0].value is True  # keep the PDF by default
 
 
-def test_progress_shows_saved_mocks(record_file, parsed):
+def test_dashboard_shows_saved_mocks(record_file, parsed):
     _seed(record_file, parsed, [("Mock 1", "2026-10-01"), ("Mock 2", "2026-10-15")])
-    at = _run()
+    at = _app()
     assert not at.exception
     metrics = {m.label: m.value for m in at.metric}
-    assert metrics["Mocks analysed"] == "2"
     assert metrics["Latest score"] == "85"
-    assert len(at.dataframe) == 1  # the all-mocks table
-    assert at.text_input[0].value == "Mock 3"  # next name is suggested
+    assert metrics["Best score"] == "85"
+    assert any("2 mocks" in m.value for m in at.markdown)
 
 
-def test_name_clash_warns_before_replacing(record_file, parsed):
+def test_add_page_suggests_next_name_and_warns_on_clash(record_file, parsed):
     _seed(record_file, parsed, [("Mock 1", "2026-10-01")])
-    at = _run()
+    at = _app("views/add.py")
+    assert at.text_input[0].value == "Mock 2"
     at.text_input[0].set_value("mock 1").run()
     assert any("already saved" in w.value for w in at.warning)
 
 
-def test_opening_a_saved_mock_shows_its_report(record_file, parsed):
+def test_all_mocks_lists_every_mock(record_file, parsed):
     _seed(record_file, parsed, [("Mock 1", "2026-10-01"), ("Mock 2", "2026-10-15")])
-    at = _run(open_id="mock-2")
+    at = _app("views/mocks.py")
     assert not at.exception
-    assert any(h.value.startswith("Mock 2") for h in at.header)
-    assert any("Against Mock 1" in m.value for m in at.markdown)
-    assert [t.label for t in at.tabs] == ["Summary", "Topics", "7-day plan", "Wrong answers"]
+    assert len(at.dataframe) == 1
+    assert list(at.dataframe[0].value["Mock"]) == ["Mock 2", "Mock 1"]  # newest first
 
 
-def test_deleting_a_mock_removes_it(record_file, parsed):
-    _seed(record_file, parsed, [("Mock 1", "2026-10-01"), ("Mock 2", "2026-10-15")])
-    at = _run(open_id="mock-2")
+def test_mock_report_shows_responses_and_pdf(record_file, parsed, sample_pdf):
+    _seed(record_file, parsed, [("Mock 1", "2026-10-01"), ("Mock 2", "2026-10-15")],
+          pdf=sample_pdf.read_bytes())
+    at = _app("views/mock.py", id="mock-2")
+    assert not at.exception
+    assert [t.label for t in at.tabs][:2] == ["Overview", "Responses (100)"]
+    assert any("Original PDF (1)" == t.label for t in at.tabs)
+    assert any("Compared with your earlier mocks" in m.value for m in at.markdown)
+    labels = [b.label for b in at.get("download_button")]
+    assert "Download part-a.pdf" in labels
+
+
+def test_unknown_mock_says_so(record_file):
+    at = _app("views/mock.py", id="nope")
+    assert not at.exception
+    assert any("isn't saved" in w.value for w in at.warning)
+
+
+def test_deleting_a_mock_removes_it_and_its_pdf(record_file, parsed, sample_pdf):
+    store = _seed(record_file, parsed, [("Mock 1", "2026-10-01"), ("Mock 2", "2026-10-15")],
+                  pdf=sample_pdf.read_bytes())
+    at = _app("views/mock.py", id="mock-2")
     at.button(key="delete_mock-2").click().run()
     assert not at.exception
-    assert records.FileStore(record_file).get("mock-2") is None
-    assert {m.label: m.value for m in at.metric}["Mocks analysed"] == "1"
-    assert any("Deleted" in s.value for s in at.success)
+    fresh = records.FileStore(record_file)
+    assert fresh.get("mock-2") is None and fresh.get_files("mock-2") == []
+    assert fresh.get("mock-1") is not None and store.get_files("mock-1")
