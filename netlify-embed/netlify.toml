@@ -1,0 +1,14 @@
+# Netlify site that shows the Streamlit Community Cloud app full-screen.
+# Site: https://ssc-mock-analyser.netlify.app
+# Deploy (from inside netlify-embed/):
+#   netlify deploy --prod --dir . --no-build --site 4be823c4-e55a-4e0b-ad9f-80e833aaa9ce
+[build]
+  publish = "."
+  command = ""
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    Content-Security-Policy = "frame-src https://*.streamlit.app; frame-ancestors 'none'; default-src 'self'; style-src 'unsafe-inline'; img-src data:"
