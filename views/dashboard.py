@@ -38,7 +38,7 @@ k1.metric("Latest score", ui.num(last["summary"]["score"]),
           border=True, height="stretch")
 k2.metric("Best score", ui.num(best["summary"]["score"]), border=True, height="stretch",
           help=f"{best['mock_name']} · {best['mock_date']}")
-k3.metric(f"Average, last {len(recent)}", ui.num(statistics.mean(recent)), border=True, height="stretch",
+k3.metric(f"Average, last {len(recent)}", f"{statistics.mean(recent):.1f}".removesuffix(".0"), border=True, height="stretch",
           help="Mean score over your most recent mocks (up to five).")
 k4.metric("Latest accuracy", f"{last['summary']['accuracy']:.1f}%",
           f"{last['summary']['accuracy'] - prev['summary']['accuracy']:+.1f} pts"

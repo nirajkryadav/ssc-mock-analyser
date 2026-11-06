@@ -197,14 +197,18 @@ class FirestoreStore:
             batch.commit()
 
     def put_files(self, rid: str, files: Files) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+
         self._clear_files(rid)
         col = self._files(rid)
-        for i, (name, data) in enumerate(files):
-            # One batch per chunk keeps every request well under the 10 MiB limit.
-            for c, start in enumerate(range(0, max(len(data), 1), CHUNK)):
-                col.document(f"{i:02d}-{c:04d}").set({
-                    "file": i, "name": _safe_name(name), "chunk": c,
-                    "data": data[start:start + CHUNK]})
+        writes = [(f"{i:02d}-{c:04d}", {"file": i, "name": _safe_name(name), "chunk": c,
+                                         "data": data[start:start + CHUNK]})
+                  for i, (name, data) in enumerate(files)
+                  for c, start in enumerate(range(0, max(len(data), 1), CHUNK))]
+        # One write per chunk, several in flight: a scanned sheet is a few MB, and
+        # sequential round trips to the database region add up.
+        with ThreadPoolExecutor(min(6, len(writes)) or 1) as pool:
+            list(pool.map(lambda w: col.document(w[0]).set(w[1]), writes))
 
     def get_files(self, rid: str) -> Files:
         parts = sorted((d.to_dict() for d in self._files(rid).stream()),

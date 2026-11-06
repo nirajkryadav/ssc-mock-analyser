@@ -50,10 +50,12 @@ def _seed(path, parsed, mocks, pdf=None):
     return store
 
 
-def _app(page=None, **query):
+def _app(page=None, state=None, **query):
     at = AppTest.from_file(APP, default_timeout=60)
     for k, v in query.items():
         at.query_params[k] = v
+    for k, v in (state or {}).items():
+        at.session_state[k] = v
     if page:
         at.switch_page(page)
     return at.run()
@@ -108,8 +110,11 @@ def test_mock_report_shows_responses_and_pdf(record_file, parsed, sample_pdf):
     assert [t.label for t in at.tabs][:2] == ["Overview", "Responses (100)"]
     assert any("Original PDF (1)" == t.label for t in at.tabs)
     assert any("Compared with your earlier mocks" in m.value for m in at.markdown)
-    labels = [b.label for b in at.get("download_button")]
-    assert "Download part-a.pdf" in labels
+    # The PDF is only fetched once its tab is open.
+    assert "Download part-a.pdf" not in [b.label for b in at.get("download_button")]
+    at = _app("views/mock.py", state={"tabs_mock-2": "Original PDF (1)"}, id="mock-2")
+    assert not at.exception
+    assert "Download part-a.pdf" in [b.label for b in at.get("download_button")]
 
 
 def test_unknown_mock_says_so(record_file):

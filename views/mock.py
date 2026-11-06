@@ -79,7 +79,8 @@ if rec.get("source") == "image":
 files_meta = rec.get("files") or []
 t_over, t_resp, t_topics, t_plan, t_pdf = st.tabs([
     "Overview", f"Responses ({o.total})", "Topics", "7-day plan",
-    f"Original PDF{' (' + str(len(files_meta)) + ')' if files_meta else ''}"])
+    f"Original PDF{' (' + str(len(files_meta)) + ')' if files_meta else ''}"],
+    key=f"tabs_{rid}", on_change="rerun")  # so the PDF is fetched only when its tab opens
 
 with t_over:
     left, right = st.columns([3, 2])
@@ -169,6 +170,8 @@ with t_pdf:
         st.info("The original PDF wasn't kept for this mock (it was analysed before PDFs "
                 "were saved). Every response is still in the **Responses** tab.",
                 icon=":material/info:")
+    elif not t_pdf.open:
+        st.caption("Loading the PDF…")
     else:
         files = ui.load_files(rec)
         if not files:
