@@ -1,0 +1,14 @@
+streamlit>=1.40
+pdfplumber>=0.11
+pandas>=2.2
+pyyaml>=6.0
+numpy>=1.26
+pillow>=10.0
+
+altair>=5.0
+google-cloud-firestore>=2.19   # saved mocks, when a Firebase key is configured
+
+# Reads screen-capture PDFs that have no text layer. On macOS the built-in Vision
+# framework is used instead. Tesseract itself is a system package, installed on
+# Streamlit Community Cloud from packages.txt.
+pytesseract>=0.3.10

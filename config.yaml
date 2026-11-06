@@ -1,0 +1,48 @@
+# Marking scheme and parser tolerances. Edit freely — nothing here is hard-coded in Python.
+
+marking:
+  correct: 2.0
+  wrong: -0.5
+  skipped: 0.0
+
+sections:
+  # Question ranges are inclusive. "part" is the PART-x header printed on the sheet.
+  - key: reasoning
+    name: General Intelligence and Reasoning
+    part: PART-A
+    first_q: 1
+    last_q: 25
+  - key: general_awareness
+    name: General Awareness
+    part: PART-B
+    first_q: 26
+    last_q: 50
+  - key: quant
+    name: Quantitative Aptitude
+    part: PART-C
+    first_q: 51
+    last_q: 75
+  - key: english
+    name: English Comprehension
+    part: PART-D
+    first_q: 76
+    last_q: 100
+
+analysis:
+  weak_topic_accuracy: 0.60      # topic accuracy below this counts as weak
+  weak_topic_skip_rate: 0.50     # or more than this share skipped
+  weak_topic_min_questions: 2    # ignore topics with fewer questions than this
+  target_attempt_rate: 0.80      # attempt-strategy advice fires below this
+
+# Colour -> status. Values are sRGB hex as printed by the SSC response sheet.
+# tolerance is max per-channel distance, to survive PDF colour-space rounding.
+colours:
+  tolerance: 60
+  selected_correct: "#008000"    # green  - candidate selected, and it was right
+  selected_wrong:   "#FF0000"    # red    - candidate selected, and it was wrong
+  correct_option:   "#FFFF00"    # yellow - the right answer, not selected
+  not_answered:     "#808080"    # grey   - the "Not Answered" bar (CSS "grey")
+  # Fills to ignore outright (page chrome, buttons, header panels).
+  ignore:
+    - "#0079FE"                  # blue buttons
+    - "#226685"                  # navbar

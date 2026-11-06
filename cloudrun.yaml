@@ -1,0 +1,18 @@
+# Deployment settings for the backend, kept here so the deploy command stays
+# short and the choices are written down rather than remembered.
+#
+#   gcloud run deploy ssc-api --source . --region asia-south1 \
+#     --allow-unauthenticated --memory 1Gi --cpu 1 --timeout 300 \
+#     --max-instances 3 \
+#     --set-env-vars RECORDS_STORE=firestore,ALLOWED_ORIGINS=https://<your-site>.netlify.app
+#
+service: ssc-api
+region: asia-south1        # Mumbai — closest to you, lowest latency
+memory: 1Gi                # rendering 10 pages at 300 dpi peaks around 600 MB
+cpu: 1
+timeout: 300s              # OCR on a 10-page PART file takes 10-30s
+max_instances: 3           # a hard ceiling on cost; this is a single-user app
+min_instances: 0           # scale to zero: no traffic, no charge
+concurrency: 1             # OCR is CPU-bound, so one request per instance
+env:
+  RECORDS_STORE: firestore   # keep analysed mocks in Firestore (see DEPLOY.md)

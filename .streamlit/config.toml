@@ -1,0 +1,6 @@
+[server]
+# Nothing is written to disk; keep uploads small enough to stay in memory.
+maxUploadSize = 25
+
+[browser]
+gatherUsageStats = false

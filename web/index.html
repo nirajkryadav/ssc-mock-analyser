@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SSC Mock Analyser</title>
+<meta name="description" content="Score breakdown, weak topics, progress across mocks and a seven-day plan from your SSC CGL response sheets.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📝</text></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>SSC Mock Analyser</h1>
+  <p class="sub">Upload a response sheet, see how you are moving across every mock, and open any past one.</p>
+  <nav class="jump" aria-label="Sections">
+    <a href="#progress-card">Progress</a>
+    <a href="#upload-card">Analyse a mock</a>
+    <a href="#records-card">All mocks</a>
+  </nav>
+</header>
+
+<main>
+  <!-- ------------------------------------------------------------ progress -->
+  <section class="card" id="progress-card" aria-labelledby="progress-h">
+    <div class="card-head">
+      <h2 id="progress-h">Your progress</h2>
+      <span class="hint" id="progress-status">Loading your mocks…</span>
+    </div>
+
+    <div id="progress-empty" class="empty hidden">
+      <p><b>No mocks yet.</b> Analyse your first response sheet below. Every mock you
+        analyse is saved here, and this section fills in as you go.</p>
+    </div>
+
+    <div id="progress-body" class="hidden">
+      <div class="metrics" id="tiles"></div>
+
+      <h3>Score by mock</h3>
+      <div class="chart" id="chart-score"></div>
+
+      <h3>Accuracy by section</h3>
+      <p class="hint">Of the questions you attempted, the share you got right.</p>
+      <div class="multiples" id="chart-sections"></div>
+
+      <h3>Topics that keep costing marks</h3>
+      <p class="hint" id="topics-hint">Marks lost per topic, added up over every mock.</p>
+      <div id="chart-topics" class="hbars"></div>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------- analyse -->
+  <section class="card" id="upload-card" aria-labelledby="upload-h">
+    <h2 id="upload-h">Analyse a new mock</h2>
+    <p class="hint">
+      SSC serves one PDF per PART, so you will usually have four files. Add them
+      all; they are read one at a time and merged. The result is saved to your progress.
+    </p>
+
+    <div id="dropzone" class="dropzone" tabindex="0" role="button"
+         aria-label="Choose response sheet PDFs">
+      <input type="file" id="files" accept="application/pdf" multiple hidden>
+      <strong>Choose PDFs</strong>
+      <span>or drop them here</span>
+    </div>
+    <ul id="filelist" class="filelist"></ul>
+
+    <div class="grid">
+      <label>Mock name <input type="text" id="mock-name" value="Mock 1"></label>
+      <label>Date <input type="date" id="mock-date"></label>
+    </div>
+    <p class="hint" id="name-note"></p>
+
+    <details class="settings">
+      <summary>Marking scheme</summary>
+      <div class="grid">
+        <label>Correct <input type="number" id="mark-correct" value="2" step="0.25"></label>
+        <label>Wrong <input type="number" id="mark-wrong" value="-0.5" step="0.25"></label>
+      </div>
+    </details>
+
+    <button id="analyse" class="primary" disabled>Analyse and save</button>
+    <p id="ocr-note" class="hint"></p>
+
+    <div id="progress" class="hidden" aria-live="polite">
+      <ul id="steps" class="steps"></ul>
+    </div>
+    <div id="error" class="error hidden" role="alert"></div>
+  </section>
+
+  <!-- ------------------------------------------------------------- records -->
+  <section class="card" id="records-card" aria-labelledby="records-h">
+    <div class="card-head">
+      <h2 id="records-h">All mocks</h2>
+      <button id="dl-all" class="small" disabled>Download all (history.csv)</button>
+    </div>
+    <p class="hint" id="records-empty">Nothing saved yet.</p>
+    <div class="scroll"><table id="records" class="hidden"></table></div>
+  </section>
+
+  <!-- -------------------------------------------------------------- report -->
+  <section id="results" class="hidden" aria-labelledby="report-h">
+    <div class="card" id="headline"></div>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="summary" role="tab">Summary</button>
+      <button class="tab" data-tab="topics" role="tab">Topics</button>
+      <button class="tab" data-tab="plan" role="tab">7-day plan</button>
+      <button class="tab" data-tab="wrong" role="tab">Wrong answers</button>
+    </nav>
+
+    <div class="card panel" id="panel-summary" role="tabpanel"></div>
+    <div class="card panel hidden" id="panel-topics" role="tabpanel"></div>
+    <div class="card panel hidden" id="panel-plan" role="tabpanel"></div>
+    <div class="card panel hidden" id="panel-wrong" role="tabpanel"></div>
+
+    <div class="card downloads">
+      <button id="dl-report" class="primary">Download report (Markdown)</button>
+      <button id="dl-unmatched" class="hidden">Download unmatched.csv</button>
+    </div>
+  </section>
+</main>
+
+<div id="tooltip" class="tooltip hidden" role="status"></div>
+
+<footer>
+  <p>Your PDFs are parsed in memory and discarded. Only the scored question records
+    are kept, so past mocks can be shown again.</p>
+</footer>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+unmatched.csv
+ocr/vision_ocr
+tests/fixtures/*.pdf
+tests/fixtures/sample_ground_truth.json
+.DS_Store
+.records/
+.streamlit/secrets.toml
+*firebase-adminsdk*.json
+.firebase/

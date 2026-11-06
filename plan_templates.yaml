@@ -1,0 +1,60 @@
+# Templates for the 7-day plan. {placeholders} are filled from the analysis:
+#   {topic} {topic_a} {topic_b}  weak topics, worst first
+#   {section} {section_a} {section_b}  the two weakest sections
+#   {minutes} {questions}  block size from plan.block_minutes / plan.block_questions
+#   {day} {yesterday}  day numbers for the review block
+
+plan:
+  block_minutes: 45
+  review_minutes: 30
+  block_questions: 25
+  days: 7
+
+headers:
+  day: "Day {day} — {focus}"
+  intro: >
+    Seven days, built around your two weakest sections: {section_a} and {section_b}.
+    Every day has one timed block per weak section and a review of the previous
+    day's mistakes. Keep a log of wrong answers — the review blocks depend on it.
+
+blocks:
+  primary:
+    title: "{section_a}: {topic_a}"
+    body: "{minutes} min timed — {questions} questions on {topic_a}. Mark anything that takes over 90 seconds and move on."
+  secondary:
+    title: "{section_b}: {topic_b}"
+    body: "{minutes} min timed — {questions} questions on {topic_b}. Target {target} correct out of {questions}."
+  review:
+    title: "Review Day {yesterday}"
+    body: "{review_minutes} min — rework every question you got wrong on Day {yesterday} without looking at the solution first. Write one line on why you went wrong."
+  accuracy:
+    title: "Accuracy drill"
+    body: "{review_minutes} min — 15 questions from {topic}, untimed. The aim is a correct answer every time, not speed."
+  speed:
+    title: "Speed drill"
+    body: "{review_minutes} min — 20 easy questions from {section}, 45 seconds each. Build the habit of banking the easy marks first."
+  mock:
+    title: "Full mock"
+    body: "One full 60-minute mock under exam conditions, then analyse it here. Compare your attempt rate with today's."
+  rest:
+    title: "Light revision"
+    body: "{review_minutes} min — reread your error log for the week. No new questions."
+
+# Which blocks each day uses, in order. Day 7 is the mock.
+schedule:
+  1: [primary, secondary]
+  2: [review, primary, secondary]
+  3: [review, primary, accuracy]
+  4: [review, secondary, speed]
+  5: [review, primary, secondary]
+  6: [review, accuracy, speed]
+  7: [mock, rest]
+
+focus:
+  1: "{section_a} foundations"
+  2: "{section_a} and {section_b}"
+  3: "{topic_a} deep work"
+  4: "{topic_b} deep work"
+  5: "Mixed practice"
+  6: "Accuracy and speed"
+  7: "Full mock and review"

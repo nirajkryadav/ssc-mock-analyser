@@ -1,0 +1,22 @@
+# Netlify serves the static frontend only. Streamlit cannot run here — it needs
+# a persistent Python process and a WebSocket per visitor — so the analysis runs
+# on Cloud Run and is reached through the proxy rule below.
+[build]
+  publish = "web"
+  command = ""
+
+# Same-origin proxy to the backend. The browser only ever calls /api/* on the
+# Netlify domain, which means no CORS preflight and no API URL baked into the
+# JavaScript. Replace the host with your own Cloud Run URL after deploying.
+[[redirects]]
+  from = "/api/*"
+  to = "https://ssc-api-REPLACE-ME.a.run.app/api/:splat"
+  status = 200
+  force = true
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
