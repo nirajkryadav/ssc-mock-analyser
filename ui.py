@@ -211,7 +211,9 @@ def page_header(title: str, subtitle: str = "", action: tuple[str, str, str] | N
 CSS = """
 <style>
 .block-container { padding-top: 1.2rem; padding-bottom: 4rem; max-width: 1240px; }
-[data-testid="stHeader"] { background: transparent; height: 0; }
+/* Streamlit's header bar is invisible here but sits over the top of the page and
+   swallows clicks on streamlit.app, so the top bar never received them. */
+[data-testid="stHeader"] { display: none !important; }
 [data-testid="stToolbarActions"], [data-testid="stAppDeployButton"],
 [data-testid="stMainMenu"], [data-testid="stDecoration"] { display: none !important; }
 .st-key-topbar button[kind="secondary"] { background: #eef3fb; border-color: #cfe0f6; color: #1f62b5; }
