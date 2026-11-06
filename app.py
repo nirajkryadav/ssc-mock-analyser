@@ -144,6 +144,13 @@ st.title("SSC Mock Analyser")
 if store_key.startswith("firestore:"):
     st.caption("Upload a response sheet, follow your progress across every mock, and "
                "reopen any past one. Mocks are saved to your Firebase database.")
+elif Path(__file__).resolve().parts[1:3] == ("mount", "src"):  # Streamlit Community Cloud
+    st.caption("Upload a response sheet, follow your progress across every mock, and "
+               "reopen any past one.")
+    st.warning("**Mocks saved here will be lost.** No Firebase key is set, so they go to "
+               "this server's disk, which Streamlit wipes whenever the app restarts or "
+               "sleeps. Add the `[firebase]` section under the app's **Settings → Secrets** "
+               "to keep them.", icon=":material/warning:")
 else:
     st.caption("Upload a response sheet, follow your progress across every mock, and "
                "reopen any past one. Mocks are saved on this computer "
