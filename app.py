@@ -12,9 +12,34 @@ Where mocks go:
     disk whenever the app restarts or sleeps.
   * Otherwise .records/ on this machine.
 """
+import sys
+from pathlib import Path
+
 import streamlit as st
 
-import ui
+
+def _drop_stale_modules() -> None:
+    """Re-import this app's own modules after a deploy changed them.
+
+    Streamlit Community Cloud applies a git push without restarting Python.
+    Page scripts run fresh each time, but modules they import (parser.py,
+    testbook.py, …) stay as first loaded, so a fix to the reader would not take
+    effect until a reboot. Comparing file times on each run catches that.
+    """
+    root = Path(__file__).resolve().parent
+    stamp = tuple(sorted((p.name, p.stat().st_mtime_ns) for p in root.glob("*.py")))
+    if getattr(sys, "_ssc_module_stamp", None) == stamp:
+        return
+    for name, module in list(sys.modules.items()):
+        file = getattr(module, "__file__", None)
+        if file and name != "__main__" and Path(file).resolve().parent == root:
+            del sys.modules[name]
+    sys._ssc_module_stamp = stamp
+
+
+_drop_stale_modules()
+
+import ui  # noqa: E402  (after the stale-module check on purpose)
 
 st.set_page_config(page_title="SSC Mock Analyser", page_icon="📝", layout="wide")
 
