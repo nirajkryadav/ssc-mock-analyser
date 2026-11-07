@@ -1,0 +1,160 @@
+# SSC CGL Tier-1 syllabus, used by the Syllabus page to track what you have covered.
+#
+# section key (matches config.yaml) -> topic -> list of subtopics.
+# A topic may name `mocks:` — the topic labels from topics.yaml whose mock results
+# are shown beside it. Without it, a topic with the same name is used.
+# Ticks are stored by "section/topic/subtopic", so renaming a subtopic here
+# un-ticks it; adding new ones is safe.
+
+reasoning:
+  Analogy:
+    subtopics: [Number analogy, Letter analogy, Word / semantic analogy, Number-pair and letter-pair analogy, Figural analogy]
+  Classification (Odd One Out):
+    mocks: [Odd One Out]
+    subtopics: [Number classification, Letter classification, Word / semantic classification, Figural classification]
+  Series:
+    subtopics: [Number series, Letter series, Alpha-numeric series, Missing / wrong term, Figural series]
+  Coding-Decoding:
+    subtopics: [Letter coding, Number coding, Word and sentence coding (code language), Symbol / mixed coding, Letter-cluster coding]
+  Mathematical Operations:
+    mocks: [Mathematical Reasoning]
+    subtopics: [Sign and symbol substitution, Interchanging signs and numbers, Balancing equations, Missing number in figures and matrices]
+  Arithmetic Reasoning:
+    subtopics: [Age-based reasoning, Number puzzles, Problems on arithmetic operations]
+  Blood Relation:
+    subtopics: [Direct relations, Pointing / photograph type, Coded relations (+ - x ÷), Family-tree puzzles]
+  Direction Sense:
+    subtopics: [Distance and direction, Turns and final direction, Shadow-based questions]
+  Order and Ranking:
+    subtopics: [Position in a row, Comparison (tallest / heaviest), Linear seating arrangement, Circular seating arrangement, Floor / box puzzles]
+  Syllogism:
+    subtopics: [Two statements, Three or more statements, Possibility cases, Either-or cases]
+  Venn Diagram:
+    subtopics: [Relationship representation, Counting from a Venn diagram]
+  Statement and Conclusion:
+    mocks: [Statement-Conclusion, Statement-Inference]
+    subtopics: [Statement and conclusion, Statement and assumption, Course of action, Statement and argument, Inference from a passage]
+  Logical Sequence and Dictionary Order:
+    mocks: [Logical Sequence]
+    subtopics: [Logical sequence of words, Dictionary order, Word formation from a given word]
+  Non-verbal (Figures):
+    mocks: [Figure / Paper Cut]
+    subtopics: [Mirror image, Water image, Paper folding, Paper cutting and punching, Embedded figures, Figure completion, Counting figures (triangles / squares), Dice, Cube and cuboid cutting]
+  Matrix and Grid:
+    mocks: [Classification Grid]
+    subtopics: [Number matrix, Letter / symbol grids, Rows and columns relationships]
+  Clock and Calendar:
+    subtopics: [Clock angles and mirror time, Calendar day-of-week]
+  Social and Emotional Intelligence:
+    mocks: [Verbal Passage]
+    subtopics: [Situation-based reasoning, Critical thinking, Space orientation and visualisation]
+
+general_awareness:
+  Ancient History:
+    mocks: [History]
+    subtopics: [Indus Valley Civilisation, Vedic period, Buddhism and Jainism, Mahajanapadas and Mauryas, Post-Mauryan kingdoms, Gupta empire, Sangam age and South Indian kingdoms]
+  Medieval History:
+    mocks: [History]
+    subtopics: [Early medieval kingdoms (Rajputs / Cholas), Delhi Sultanate, Vijayanagara and Bahmani, Mughal empire, Marathas, Bhakti and Sufi movements]
+  Modern History:
+    mocks: [History]
+    subtopics: [Advent of Europeans, British expansion and Governors-General, Revolt of 1857, Socio-religious reform movements, Indian National Congress (moderates / extremists), Gandhian era movements, Revolutionaries, Constitutional acts (1773–1947), Independence and partition]
+  Physical Geography:
+    mocks: [Geography]
+    subtopics: [Universe and solar system, Earth's interior, Rocks and minerals, Landforms, Atmosphere and its layers, Winds pressure and cyclones, Oceans and currents]
+  Indian Geography:
+    mocks: [Geography]
+    subtopics: [Physiographic divisions, Rivers and drainage, Climate and monsoon, Soils, Natural vegetation and forests, National parks and sanctuaries, Minerals and energy resources, Agriculture and crops, Industries, Transport]
+  World Geography:
+    mocks: [Geography]
+    subtopics: [Continents and countries, Mountains / rivers / lakes / deserts, Straits and important places]
+  Polity:
+    subtopics: [Making of the Constitution, Preamble, Schedules, Important Articles and Parts, Fundamental Rights, Directive Principles, Fundamental Duties, President / Vice-President, Prime Minister and Council of Ministers, Parliament, Judiciary, State government and Governor, Panchayati Raj and municipalities, Constitutional bodies, Non-constitutional bodies, Amendments, Emergency provisions, Centre-state relations]
+  Economy:
+    subtopics: [GDP / GNP / national income, Inflation, Money and banking, RBI and monetary policy, Budget and fiscal policy, Taxation and GST, Five-Year Plans and NITI Aayog, Government schemes, Poverty and unemployment, Agriculture economy (MSP / Green Revolution), International bodies (IMF / World Bank / WTO), Census and demography]
+  Physics:
+    mocks: [Science]
+    subtopics: [Units and measurement, Motion and laws of motion, Work energy and power, Gravitation, Pressure and fluids, Heat and thermodynamics, Sound, Light, Electricity, Magnetism, Inventions and scientists]
+  Chemistry:
+    mocks: [Science]
+    subtopics: [Matter and its states, Atomic structure, Periodic table, Chemical bonding, Acids bases and salts, Metals and non-metals, Carbon and its compounds, Chemical reactions, Everyday chemistry (fuels / polymers / fertilisers)]
+  Biology:
+    mocks: [Science]
+    subtopics: [Cell and tissues, Classification of living things, Digestive system, Circulatory system, Respiratory system, Nervous and endocrine systems, Nutrition and vitamins, Diseases and pathogens, Plant physiology, Genetics and heredity, Ecology and environment]
+  Computer Basics:
+    subtopics: [Hardware and software, Memory and storage, MS Office basics, Internet and networking, Abbreviations and shortcuts]
+  Art and Culture:
+    subtopics: [Classical dances, Folk dances, Music and instruments, Festivals, Paintings, Architecture and monuments, UNESCO heritage sites, Books and authors]
+  Sports:
+    subtopics: [Olympics, Asian and Commonwealth Games, Cricket, Other sports (terms / trophies), Sports awards, Famous players]
+  Awards and Honours:
+    subtopics: [Bharat Ratna and Padma awards, Gallantry awards, Nobel prize, Literary awards (Jnanpith / Sahitya Akademi), Film awards]
+  Static GK:
+    subtopics: [National symbols, Firsts in India and the world, Important days, Organisations and headquarters, Capitals and currencies, Dams and power plants]
+  Current Affairs:
+    mocks: [Current Affairs, Defence and Exercises]
+    subtopics: [National news (last 12 months), International news, Appointments, Summits and agreements, Schemes launched, Defence exercises, Science and technology, Reports and indices]
+
+quant:
+  Number System:
+    subtopics: [Types of numbers, Divisibility rules, HCF and LCM, Remainders, Unit digit, Factors, Fractions and decimals]
+  Simplification:
+    subtopics: [BODMAS, Surds and indices, Square and cube roots, Approximation]
+  Percentage:
+    subtopics: [Basics and conversions, Increase and decrease, Successive change, Population and depreciation, Election and exam problems]
+  Ratio and Proportion:
+    subtopics: [Ratio basics, Proportion, Partnership, Mixture and alligation, Ages]
+  Average:
+    subtopics: [Simple average, Weighted average, Replacement / adding a member]
+  Profit and Loss:
+    subtopics: [CP / SP / profit %, Marked price and discount, Successive discounts, Dishonest dealer]
+  Simple and Compound Interest:
+    subtopics: [Simple interest, Compound interest, CI vs SI difference, Instalments]
+  Time and Work:
+    subtopics: [Work and efficiency, Working together and alternately, Pipes and cisterns, Wages]
+  Time Speed Distance:
+    subtopics: [Speed basics and average speed, Relative speed, Trains, Boats and streams, Races]
+  Algebra:
+    subtopics: [Algebraic identities, Linear equations, Quadratic equations, x + 1/x type problems, Polynomials and factorisation, Graphs of linear equations]
+  Geometry:
+    subtopics: [Lines and angles, Triangles (congruence / similarity), Centres of a triangle, Quadrilaterals and polygons, Circles (chords / tangents), Common tangents]
+  Coordinate Geometry:
+    subtopics: [Distance and section formula, Slope and line equations, Area of a triangle]
+  Mensuration:
+    subtopics: [2D areas and perimeters, Cube and cuboid, Cylinder, Cone, Sphere and hemisphere, Prism and pyramid]
+  Trigonometry:
+    subtopics: [Ratios and standard angles, Identities, Complementary angles, Maximum and minimum values, Heights and distances]
+  Data Interpretation:
+    subtopics: [Tables, Bar graphs, Line graphs, Pie charts, Histograms and frequency polygons, Mean / median / mode]
+
+english:
+  Grammar Basics:
+    mocks: [Error Spotting, Sentence Improvement]
+    subtopics: [Parts of speech, Tenses, Subject-verb agreement, Articles, Prepositions, Conjunctions, Nouns and pronouns, Adjectives and adverbs, Modals, Conditionals, Question tags]
+  Error Spotting:
+    subtopics: [Noun / pronoun errors, Verb and tense errors, Preposition and article errors, Adjective / adverb errors, Practice sets]
+  Sentence Improvement:
+    subtopics: [Phrase replacement, Fill in the blanks, Practice sets]
+  Active / Passive:
+    subtopics: [Rules by tense, Imperative and question forms, Practice sets]
+  Direct / Indirect:
+    subtopics: [Statements, Questions, Commands and exclamations, Practice sets]
+  Synonym:
+    subtopics: [Root words and prefixes, Previous-year word list, Practice sets]
+  Antonym:
+    subtopics: [Previous-year word list, Practice sets]
+  One Word Substitution:
+    subtopics: [Previous-year list, Practice sets]
+  Idioms and Phrases:
+    subtopics: [Previous-year list, Practice sets]
+  Spelling:
+    subtopics: [Commonly misspelt words, Practice sets]
+  Homonyms:
+    subtopics: [Homonyms and homophones, Practice sets]
+  Cloze Test:
+    subtopics: [Grammar-based blanks, Vocabulary-based blanks, Practice sets]
+  Reading Comprehension:
+    subtopics: [Main idea and title, Fact-based questions, Inference and tone, Vocabulary in context]
+  Para Jumbles:
+    mocks: [Para Jumbles]
+    subtopics: [Sentence rearrangement, Opening / closing sentence]

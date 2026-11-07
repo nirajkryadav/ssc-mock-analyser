@@ -169,3 +169,33 @@ def test_dashboard_shows_the_gap_to_the_target(record_file, parsed):
     assert not at.exception
     metrics = {m.label: m.value for m in at.metric}
     assert metrics["Marks to 165"] == "80"
+
+
+def test_syllabus_ticks_are_saved(record_file):
+    at = _app(page="views/syllabus.py")
+    assert not at.exception
+    assert [t.label for t in at.tabs][:4] == ["Reasoning", "General Awareness", "Quant",
+                                               "English"]
+    box = next(c for c in at.checkbox if c.key == "sy::quant/Algebra/Linear equations")
+    box.check().run()
+    assert not at.exception
+    saved = records.FileStore(record_file).get_doc("syllabus")
+    assert saved == {"done": ["quant/Algebra/Linear equations"]}
+    assert "1 of" in at.metric[0].delta
+
+    # A fresh session loads the tick back.
+    again = _app(page="views/syllabus.py")
+    assert next(c for c in again.checkbox
+                if c.key == "sy::quant/Algebra/Linear equations").value is True
+
+
+def test_syllabus_mark_all_and_weak_filter(record_file, parsed):
+    _seed(record_file, parsed, [("Mock 1", "2026-10-28")])
+    at = _app(page="views/syllabus.py")
+    next(b for b in at.button if b.key == "sy_all_english_0").click().run()
+    assert not at.exception
+    done = records.FileStore(record_file).get_doc("syllabus")["done"]
+    assert len([d for d in done if d.startswith("english/Grammar Basics/")]) == 11
+    assert any("In your mocks" in c.value for c in at.caption)
+    at.segmented_control(key="sy_show").set_value("Weak in mocks").run()
+    assert not at.exception

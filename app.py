@@ -51,9 +51,12 @@ page = st.navigation([
     st.Page(ui.PAGE_MOCK, title="Mock report", icon=":material/description:",
             url_path="mock"),
     st.Page(ui.PAGE_ADD, title="Add a mock", icon=":material/upload_file:", url_path="add"),
+    st.Page(ui.PAGE_SYLLABUS, title="Syllabus", icon=":material/checklist:",
+            url_path="syllabus"),
 ], position="hidden")  # our own top bar, so it shows in embedded mode too
 
 ui.apply_css()
-NAV = {"Dashboard": ui.PAGE_DASHBOARD, "All mocks": ui.PAGE_MOCKS, "Add a mock": ui.PAGE_ADD}
+NAV = {"Dashboard": ui.PAGE_DASHBOARD, "All mocks": ui.PAGE_MOCKS, "Add a mock": ui.PAGE_ADD,
+       "Syllabus": ui.PAGE_SYLLABUS}
 ui.topbar(current=NAV.get(page.title, ""))
 page.run()

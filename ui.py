@@ -21,6 +21,7 @@ import parser as sheet_parser
 import records as records_mod
 import report as report_mod
 import scoring
+import syllabus as syllabus_mod
 import topics as topics_mod
 from parser import SheetMeta
 
@@ -44,6 +45,7 @@ PAGE_DASHBOARD = "views/dashboard.py"
 PAGE_MOCKS = "views/mocks.py"
 PAGE_MOCK = "views/mock.py"
 PAGE_ADD = "views/add.py"
+PAGE_SYLLABUS = "views/syllabus.py"
 
 
 def target_score() -> float | None:
@@ -92,6 +94,15 @@ def _templates(stamp: float) -> dict[str, Any]:
     return report_mod.load_templates()
 
 
+@st.cache_resource(max_entries=2)
+def _syllabus(stamp: float):
+    return syllabus_mod.load_syllabus()
+
+
+def syllabus():
+    return _syllabus(_mtime(syllabus_mod.SYLLABUS_PATH))
+
+
 def config() -> dict[str, Any]:
     return _config(_mtime(sheet_parser.CONFIG_PATH))
 
@@ -127,20 +138,22 @@ def store_key() -> str:
     return f"file:{os.environ.get('RECORDS_FILE', records_mod.DEFAULT_FILE)}"
 
 
-@st.cache_resource(show_spinner=False)
-def _store(key: str) -> records_mod.RecordStore:
+@st.cache_resource(show_spinner=False, max_entries=2)
+def _store(key: str, code: float = 0.0) -> records_mod.RecordStore:
+    # `code` is records.py's modification time: after a deploy changes the store
+    # classes, a connection built from the old ones must not be reused.
     if key.startswith("firestore:"):
         return records_mod.FirestoreStore.from_service_account(_firebase_key())
     return records_mod.FileStore(Path(key.split(":", 1)[1]))
 
 
 def store() -> records_mod.RecordStore:
-    return _store(store_key())
+    return _store(store_key(), _mtime(Path(records_mod.__file__)))
 
 
 @st.cache_data(ttl=300, show_spinner="Loading your mocks…")
 def _load_records(key: str) -> list[dict[str, Any]]:
-    return records_mod.sorted_records(_store(key).list())
+    return records_mod.sorted_records(_store(key, _mtime(Path(records_mod.__file__))).list())
 
 
 def load_records() -> list[dict[str, Any]]:
@@ -242,6 +255,7 @@ def topbar(current: str = "") -> None:
         st.space("stretch")
         for label, page, icon in (("Dashboard", PAGE_DASHBOARD, ":material/space_dashboard:"),
                                   ("All mocks", PAGE_MOCKS, ":material/table_rows:"),
+                                  ("Syllabus", PAGE_SYLLABUS, ":material/checklist:"),
                                   ("Add a mock", PAGE_ADD, ":material/upload_file:")):
             go(label, page, icon, key=f"nav_{page}",
                type="secondary" if page == current else "tertiary")

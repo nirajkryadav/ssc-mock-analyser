@@ -31,6 +31,7 @@ from parser import Question
 
 ROOT = Path(__file__).resolve().parent
 COLLECTION = "mocks"
+DOCS_COLLECTION = "app"  # app-wide documents, e.g. "syllabus" progress
 DEFAULT_FILE = ROOT / ".records" / "records.json"
 
 
@@ -53,6 +54,8 @@ class RecordStore(Protocol):
     def delete(self, rid: str) -> bool: ...
     def put_files(self, rid: str, files: Files) -> None: ...
     def get_files(self, rid: str) -> Files: ...
+    def get_doc(self, name: str) -> dict[str, Any]: ...
+    def put_doc(self, name: str, doc: dict[str, Any]) -> None: ...
 
 
 def _safe_name(name: str) -> str:
@@ -66,6 +69,7 @@ class MemoryStore:
     def __init__(self) -> None:
         self._data: dict[str, dict[str, Any]] = {}
         self._files: dict[str, Files] = {}
+        self._docs: dict[str, dict[str, Any]] = {}
 
     def list(self) -> list[dict[str, Any]]:
         return [dict(r) for r in self._data.values()]
@@ -88,6 +92,13 @@ class MemoryStore:
     def get_files(self, rid: str) -> Files:
         return list(self._files.get(rid, []))
 
+    def get_doc(self, name: str) -> dict[str, Any]:
+        """An app-wide document such as syllabus progress ({} if never saved)."""
+        return json.loads(json.dumps(self._docs.get(name, {})))
+
+    def put_doc(self, name: str, doc: dict[str, Any]) -> None:
+        self._docs[name] = json.loads(json.dumps(doc))
+
 
 class FileStore(MemoryStore):
     """MemoryStore written through to a JSON file; PDFs go in a folder beside it."""
@@ -99,14 +110,27 @@ class FileStore(MemoryStore):
         self.path = Path(path)
         self.files_dir = self.path.parent / "files"
         self._lock = threading.Lock()
+        # App-wide documents live beside the records, not inside them, so the
+        # records file stays a plain {id: mock} map.
+        self.docs_path = self.path.with_name(self.path.stem + "-docs.json")
         if self.path.exists():
             self._data = json.loads(self.path.read_text("utf-8") or "{}")
+        if self.docs_path.exists():
+            self._docs = json.loads(self.docs_path.read_text("utf-8") or "{}")
 
     def _flush(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps(self._data, ensure_ascii=False), "utf-8")
         tmp.replace(self.path)
+
+    def put_doc(self, name: str, doc: dict[str, Any]) -> None:
+        with self._lock:
+            super().put_doc(name, doc)
+            self.docs_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.docs_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(self._docs, ensure_ascii=False), "utf-8")
+            tmp.replace(self.docs_path)
 
     def _dir(self, rid: str) -> Path:
         return self.files_dir / record_id(rid)
@@ -158,6 +182,7 @@ class FirestoreStore:
         self.project = project
         self._client = firestore.Client(project=project, credentials=credentials)
         self._col = self._client.collection(COLLECTION)
+        self._docs = self._client.collection(DOCS_COLLECTION)
 
     @classmethod
     def from_service_account(cls, info: dict[str, Any]) -> "FirestoreStore":
@@ -184,6 +209,13 @@ class FirestoreStore:
             return False
         ref.delete()
         return True
+
+    def get_doc(self, name: str) -> dict[str, Any]:
+        snap = self._docs.document(name).get()
+        return (snap.to_dict() or {}) if snap.exists else {}
+
+    def put_doc(self, name: str, doc: dict[str, Any]) -> None:
+        self._docs.document(name).set(doc)
 
     def _files(self, rid: str):
         return self._col.document(rid).collection("files")

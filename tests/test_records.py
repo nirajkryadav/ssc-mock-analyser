@@ -122,3 +122,17 @@ def test_firestore_delete_removes_the_pdf_chunks():
     s.put_files("m", _pdfs())
     assert s.delete("m")
     assert db == {}
+
+
+def test_app_documents_round_trip_in_every_store(tmp_path):
+    store = records.FileStore(tmp_path / "records.json")
+    assert store.get_doc("syllabus") == {}
+    store.put_doc("syllabus", {"done": ["quant/Algebra/Linear equations"]})
+    again = records.FileStore(tmp_path / "records.json")
+    assert again.get_doc("syllabus") == {"done": ["quant/Algebra/Linear equations"]}
+    assert again.list() == []  # documents are not mocks
+
+    fs, db = _fake_firestore()
+    fs._docs = _Col(db, "app")
+    fs.put_doc("syllabus", {"done": ["a"]})
+    assert fs.get_doc("syllabus") == {"done": ["a"]} and fs.list() == []

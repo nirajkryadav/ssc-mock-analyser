@@ -44,6 +44,10 @@ misread.
   score and section accuracy over time, the topics that keep costing marks, and
   a table of all past mocks you can reopen.
 - **Writes a 7-day plan** from fixed templates in `plan_templates.yaml`.
+- **Tracks the syllabus**: the Syllabus page lists every CGL Tier-1 topic by
+  section, with subtopics to tick as you finish them. Ticks are saved with your
+  mocks (Firestore document `app/syllabus`), and each topic shows how you did on
+  it across your mocks, with a filter for the ones costing you marks.
 
 ## Getting your response sheet
 
@@ -146,6 +150,7 @@ Three YAML files, no code changes needed:
 
 | `topics.yaml` | the keyword dictionaries, per section |
 | `plan_templates.yaml` | the wording and shape of the 7-day plan |
+| `syllabus.yaml` | the Syllabus checklist: topics and subtopics per section, and which mock topics each one maps to |
 
 **Improving the topic dictionaries.** Matching takes the first keyword hit in
 YAML order, so put specific phrases above generic ones. Keywords match on word
@@ -250,6 +255,8 @@ views/dashboard.py      progress across every mock
 views/mocks.py          table of all mocks: search, sort, open, delete, export
 views/mock.py           one mock: overview, every response, topics, plan
 views/add.py            upload, analyse and save (timed)
+views/syllabus.py       syllabus checklist with progress per section
+syllabus.py             syllabus loading, progress counts, mock results per topic
 records.py              saved mocks: Firestore / file / memory stores
 tools/firebase_secrets.py   key .json -> Streamlit secrets TOML
 netlify-embed/          Netlify page showing the Streamlit app full-screen
@@ -268,6 +275,7 @@ scoring.py              marks, accuracy, history merging and trends
 report.py               weak areas, attempt advice, 7-day plan, Markdown
 config.yaml             marking, sections, thresholds, colours
 topics.yaml             keyword dictionaries
+syllabus.yaml           the syllabus checklist
 plan_templates.yaml     plan wording
 tests/
   conftest.py           shared fixtures
